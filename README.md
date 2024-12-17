@@ -1,4 +1,4 @@
-# **Async-Rust-WebServer**
+# **webServer**
 
 Un serveur web rapide et simple basé sur Rust, capable de servir des fichiers statiques, exécuter des scripts CGI, et rediriger les requêtes avec une configuration flexible.
 
@@ -19,6 +19,6 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
 
 1. Clone le projet et construis le binaire :  
    ```bash
-   git clone https://github.com/ton-compte/async-rust-webserver.git
-   cd async-rust-webserver
-   cargo build --release
+   git clone https://github.com/ton-compte/webServer.git
+   cd webServer
+   cargo run --release
