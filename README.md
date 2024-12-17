@@ -11,14 +11,14 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
 - **Ports multiples** : Chaque bloc `server` peut écouter sur un port différent.  
 - **Support CGI** : Exécution des scripts `.py`, `.sh`, et `.php` via des interpréteurs définis.  
 - **Redirections** : Gestion facile des redirections permanentes ou temporaires.  
-- **Limitations personnalisées** : Définir des tailles de corps, méthodes autorisées ou règles spécifiques par chemin.  
+- **Limitations personnalisées** : Définir des tailles de body, méthodes autorisées ou règles spécifiques par chemin.  
 
 ---
 
 ## **Lancer le serveur**  
 
-1. Clone le projet et construis le binaire :  
+1. Clone le projet et lance le :  
    ```bash
-   git clone https://github.com/ton-compte/webServer.git
+   git clone https://github.com/iibabyy/webServer.git
    cd webServer
    cargo run --release
