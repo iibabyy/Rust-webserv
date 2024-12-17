@@ -1,6 +1,6 @@
 # **webServer**
 
-Un serveur web rapide et simple basé sur Rust, capable de servir des fichiers statiques, exécuter des scripts CGI, et rediriger les requêtes avec une configuration flexible.
+Un serveur web en asynchrone, rapide et simple basé sur Rust, capable de servir des fichiers statiques, exécuter des scripts CGI, et rediriger les requêtes avec une configuration flexible.
 
 ---
 
