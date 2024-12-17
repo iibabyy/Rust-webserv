@@ -19,6 +19,6 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
 
 1. Clone le projet et lance le :  
    ```bash
-   git clone https://github.com/iibabyy/webServer.git
+   git clone https://github.com/iibabyy/Rust-webServer.git
    cd webServer
    cargo run --release
