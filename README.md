@@ -21,4 +21,5 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
    ```bash
    git clone https://github.com/iibabyy/Rust-webServer.git
    cd webServer
+   unzip URIs.zip -d URIs
    cargo run --release
