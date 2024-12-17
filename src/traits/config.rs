@@ -1,17 +1,12 @@
-use std::{collections::HashMap, fmt::format, io::{Error, ErrorKind}, path::PathBuf};
+use std::{collections::HashMap, io::{self, Error, ErrorKind}, path::PathBuf};
 
-use nom::InputIter;
-use tokio::net::TcpStream;
+use tokio::fs::File;
 
 use crate::{
     request::request::{Method, Request},
     response::response::{Response, ResponseCode},
     server::location::Location,
 };
-
-fn is_redirect_status_code(code: u16) -> bool {
-    code == 301 || code == 302 || code == 303 || code == 307
-}
 
 #[allow(dead_code)]
 pub trait Config {
@@ -39,20 +34,109 @@ pub trait Config {
     fn is_location(&self) -> bool;
 
 	/*------------------------------------------------------------*/
+	/*-----------------------[ Response ]-------------------------*/
+	/*------------------------------------------------------------*/
+
+	async fn build_response(&self, request: &Request) -> Result<Response, Error> {
+		eprintln!("Building response...");
+		match request.method() {
+			&Method::GET => { return self.build_get_response(request).await },
+			_ => return Err(Error::new(ErrorKind::Other, "method not implemented")), // not implemented
+		}
+	}
+
+	async fn build_get_response(&self, request: &Request) -> Result<Response, Error> {
+		eprintln!("Building GET response for '{}'...", request.path().display());
+		// todo! list files if no auto_index
+		// todo! handle GET on cgi
+
+		let file = self.get_GET_request_file(request).await?;
+
+		eprintln!("GET response build...");
+		let mut response = Response::
+			new(ResponseCode::new(200))
+			.file(file);
+
+		response.add_header("Content-Type".to_owned(), "text/html".to_owned());
+
+		Ok(response)
+
+	}
+
+	#[allow(non_snake_case)]
+	async fn get_GET_request_file(&self, request: &Request) -> io::Result<File> {
+
+		if request.path().is_file() {
+			match File::open(request.path()).await {
+				Ok(file) => return Ok(file),
+				Err(err) => return Err(err),
+			}
+		}
+		
+		let auto_index: bool = self.auto_index() == true && request.path().is_dir();
+
+		if auto_index == true && self.index().is_some() {
+			let path = format!(
+				"{}/{}",
+				request.path().to_str().unwrap(),
+				self.index().unwrap(),
+			);
+
+			match File::open(path).await {
+				Ok(file) => return Ok(file),
+				Err(err) => return Err(err),
+			}
+		}
+		
+		Err(Error::new(ErrorKind::NotFound, "file not found"))
+	}
+
+	/*------------------------------------------------------------*/
 	/*-----------------------[ Parsing ]--------------------------*/
 	/*------------------------------------------------------------*/
 
-	fn parse_request(&self, request: &Request) -> Result<(), ResponseCode> {
-		if let Some(location) = self.is_request_in_location(request) {
+	fn parse_request(&self, request: &mut Request) -> Result<(), ResponseCode> {
+		if let Some(location) = self.get_request_location(request) {
+			eprintln!("Location...");
 			return location.parse_request(request);
 		}
-
+		eprintln!("Parsing request...");
+		
 		self.parse_method(request)?;
 
 		if request.content_length()  > self.max_body_size() {
 			return Err(ResponseCode::new(413));
 		}
 
+		self.format_path(request)?;
+
+		Ok(())
+	}
+
+	fn format_path(&self, request: &mut Request) -> Result<(), ResponseCode> {
+		let path = if self.root().is_some() {
+			let mut path = self.root().unwrap().clone();
+			path = PathBuf::from(format!(
+				"{}/{}", path.to_str().unwrap(),
+				request.path().to_str().unwrap(),
+			));
+
+			path
+		} else if self.alias().is_some() {
+			let path = request.path().to_str().unwrap().to_string();
+			let path = path.replacen(self.path().to_str().unwrap(), self.alias().unwrap().to_str().unwrap(), 1);
+			eprintln!(
+				"[\n\tAlias: {} -> {}\n\tpath: {}\n\t result: {}\n]",
+				self.path().display(),
+				self.alias().unwrap().display(),
+				request.path().display(),
+				path,
+			);
+			
+			PathBuf::from(path)
+		} else { return Err(ResponseCode::new(404)) };
+		
+		request.set_path(path);
 		Ok(())
 	}
 
@@ -92,44 +176,7 @@ pub trait Config {
         };
     }
 
-    // fn is_general_field(&self, field: String) -> bool {
-    //     let general = vec![
-    //         "cgi",
-    //         "index",
-    //         "auto_index",
-    //         "allowed_methods",
-    //         "root",
-    //         "listen",
-    //     ];
-
-    //     return general.contains(&field.as_str());
-    // }
-
-    // fn get_final_path(&self, request: &PathBuf) -> Option<PathBuf> {
-    //     let path = if self.root().is_some() {
-	// 		let mut path = self.root().unwrap().to_owned().to_str().unwrap().to_owned();
-	// 		path = format!("{}/{}", path, request.to_str().unwrap());
-	// 		eprintln!("path: {}", path);
-	// 		path
-	// 	} else if self.alias().is_some() {
-	// 		todo!()
-	// 	} else {
-	// 		return None
-	// 	};
-
-	// 	let mut path = PathBuf::from(path);
-
-	// 	if path.exists() == false {
-	// 		return None
-	// 	} else if path.is_dir() && self.index().is_some() {
-	// 		path.push(self.index().unwrap());
-	// 	}
-
-	// 	Some(path)
-
-    // }
-
-	fn is_request_in_location(&self, request: &Request) -> Option<&Location> {
+	fn get_request_location(&self, request: &Request) -> Option<&Location> {
 		if self.is_location() == true { return None }
 		if self.locations().is_none() { return None }
 
@@ -163,203 +210,9 @@ pub trait Config {
 		save
 	}
 
-	/*------------------------------------------------------------*/
-	/*-------------------[ Config Parsing ]-----------------------*/
-	/*------------------------------------------------------------*/
-
-
-    fn extract_root(value: Vec<String>) -> Result<PathBuf, String> {
-        if value.len() != 1 {
-            return Err("invalid field: root".to_owned());
-        }
-
-        let mut path = PathBuf::from(&value[0]);
-        if path.is_dir() == false {
-            return Err(value[0].clone() + ": invalid root directory");
-        }
-
-        Ok(path)
-    }
-
-    fn extract_alias(value: Vec<String>) -> Result<PathBuf, String> {
-        if value.len() != 1 {
-            return Err("invalid field: root".to_owned());
-        }
-
-        let path = PathBuf::from(&value[0]);
-
-        if path.to_str().unwrap().iter_elements().last() != Some('/') {
-            return Err(value[0].clone() + ": alias must ends with '/'");
-        }
-
-        Ok(path)
-    }
-
-    fn extract_max_body_size(value: Vec<String>) -> Result<u64, String> {
-        if value.len() != 1 {
-            return Err("invalid field: client_max_body_size".to_owned());
-        }
-
-        let num = value[0].parse::<u64>();
-
-        return match num {
-            Ok(num) => Ok(num),
-            Err(e) => Err(format!("invalid field: client_max_body_size: {e}")),
-        };
-    }
-
-    fn extract_error_page(
-        value: Vec<String>,
-    ) -> Result<
-        (
-            Option<HashMap<u16, String>>,
-            Option<HashMap<u16, (Option<u16>, String)>>,
-        ),
-        String,
-    > {
-        if value.is_empty() {
-            return Err(format!("invalid field: error_page: empty"));
-        }
-
-        let mut pages = HashMap::new();
-        let mut redirect = HashMap::new();
-
-        let mut it = value.iter();
-        while let Some(str) = it.next() {
-            let code = match str.parse::<u16>() {
-                Ok(num) => num,
-                Err(e) => return Err(format!("invalid field: error_page: {str}: {e}")),
-            };
-
-            let str = match it.next() {
-                Some(str) => str,
-                None => {
-                    return Err(format!(
-                        "invalid field: error_page: {} have no corresponding page",
-                        code
-                    ))
-                }
-            };
-
-            if str.starts_with("=") {
-                let redirect_code = if str.len() > 1 {
-                    match str.as_str()[1..].parse::<u16>() {
-                        Ok(num) => Some(num),
-                        Err(e) => return Err(format!("invalid field: error_page: {str}: {e}")),
-                    }
-                } else {
-                    None
-                };
-
-                let str = match it.next() {
-                    Some(str) => str,
-                    None => {
-                        return Err(format!(
-                            "invalid field: error_page: {} have no corresponding redirect",
-                            code
-                        ))
-                    }
-                };
-
-                let url = str.to_owned();
-
-                redirect.insert(code, (redirect_code, url));
-            } else {
-                pages.insert(code, str.clone());
-            }
-        }
-
-        Ok((
-            if pages.is_empty() { None } else { Some(pages) },
-            if redirect.is_empty() {
-                None
-            } else {
-                Some(redirect)
-            },
-        ))
-    }
-
-    fn extract_return(value: Vec<String>) -> Result<(u16, Option<String>), String> {
-        if value.len() < 1 || value.len() > 2 {
-            return Err("invalid field: return".to_owned());
-        }
-
-        let status_code = match value[0].parse::<u16>() {
-            Ok(num) => num,
-            Err(e) => return Err(format!("invalid field: return: {e}")),
-        };
-
-        let url = if value.len() == 2 {
-            match is_redirect_status_code(status_code) {
-                true => Some(value[1].clone()),
-                false => {
-                    println!(
-                        "'return' field: not redirect code, url ignored ({status_code} {})",
-                        value[1]
-                    );
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        Ok((status_code, url))
-    }
-
-    fn extract_listen(value: Vec<String>) -> Result<(Option<u16>, bool), String> {
-        if value.len() < 1 || value.len() > 2 {
-            return Err("invalid field: port".to_owned());
-        }
-
-        let default = value.len() == 2 && value[1] == "default";
-
-        let port = value[0].parse::<u16>();
-
-        return match port {
-            Ok(num) => Ok((Some(num), default)),
-            Err(err) => Err(format!("invalid field: port: {}", err)),
-        };
-    }
-
-    fn extract_index(value: Vec<String>) -> Result<String, String> {
-        if value.len() != 1 {
-            return Err("invalid field: index".to_owned());
-        }
-
-        Ok(value[0].clone())
-    }
-
-    fn extract_auto_index(value: Vec<String>) -> Result<bool, String> {
-        if value.len() != 1 {
-            return Err("invalid field: auto_index".to_owned());
-        }
-
-        match &value[0][..] {
-            "on" => Ok(true),
-            "off" => Ok(false),
-            _ => Err(format!(
-                "invalid field: auto_index: expected 'on' or 'off', found {}",
-                value[0]
-            )),
-        }
-    }
-
-    fn extract_cgi(value: Vec<String>) -> Result<(String, PathBuf), String> {
-        if value.len() != 2 {
-            return Err("invalid field: cgi".to_owned());
-        }
-
-        let extension = value[0].clone();
-        let path = PathBuf::from(&value[1]);
-
-        if path.is_file() == false {
-            return Err(format!("invalid field: cgi: invalid path: {}", value[1]));
-        }
-        Ok((extension, path))
-    }
 
 }
+
    // async fn send_response(
     //     &self,
     //     request: &Request,

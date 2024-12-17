@@ -4,11 +4,11 @@
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use tokio::net::TcpStream;
+
+use super::parsing;
 
 use crate::{
-    request::request::{Method, Request},
-    response::response::ResponseCode,
+    request::request::Method,
     traits::config::Config,
     LocationBlock,
 };
@@ -124,7 +124,7 @@ impl Location {
 						));
 					}
 
-					let root = Self::extract_root(infos);
+					let root = parsing::extract_root(infos);
                     match root {
                         Err(e) => {
                             return Err(format!(
@@ -142,11 +142,11 @@ impl Location {
 							"invalid field: alias: alias cannot be set with root"
 						));
 					} else {
-						new_location.alias = Some(Self::extract_alias(infos)?)
+						new_location.alias = Some(parsing::extract_alias(infos)?)
 					}
 				}
                 "index" => {
-                    let index = Self::extract_index(infos);
+                    let index = parsing::extract_index(infos);
                     match index {
                         Err(e) => {
                             return Err(format!(
@@ -159,7 +159,7 @@ impl Location {
                     }
                 }
                 "auto_index" => {
-                    let auto_index = Self::extract_auto_index(infos);
+                    let auto_index = parsing::extract_auto_index(infos);
                     match auto_index {
                         Err(e) => {
                             return Err(format!(
@@ -172,7 +172,7 @@ impl Location {
                     }
                 }
                 "client_max_body_size" => {
-                    let max_body_size = Self::extract_max_body_size(infos);
+                    let max_body_size = parsing::extract_max_body_size(infos);
                     match max_body_size {
                         Err(e) => {
                             return Err(format!(
@@ -185,7 +185,7 @@ impl Location {
                     }
                 }
                 "cgi" => {
-                    let (extension, path) = match Self::extract_cgi(infos) {
+                    let (extension, path) = match parsing::extract_cgi(infos) {
                         Err(e) => {
                             return Err(format!(
                                 "location ({}) : {}",
@@ -225,7 +225,7 @@ impl Location {
                     new_location.redirect = Some(infos[0].clone());
                 }
                 "return" => {
-                    new_location.return_ = match Self::extract_return(infos) {
+                    new_location.return_ = match parsing::extract_return(infos) {
                         Err(e) => {
                             return Err(format!(
                                 "location ({}) : {}",
@@ -240,7 +240,7 @@ impl Location {
                     new_location.internal = true;
                 }
                 "error_page" => {
-                    let (pages, redirect) = Self::extract_error_page(infos)?;
+                    let (pages, redirect) = parsing::extract_error_page(infos)?;
                     let hash = &mut new_location.error_pages;
                     if pages.is_some() {
                         pages

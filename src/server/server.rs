@@ -6,43 +6,31 @@
 /*   By: ibaby <ibaby@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/12/15 05:34:36 by ibaby             #+#    #+#             */
-/*   Updated: 2024/12/17 17:05:36 by ibaby            ###   ########.fr       */
+/*   Updated: 2024/12/18 00:33:42 by ibaby            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 use std::{
-    borrow::{BorrowMut, Cow},
     collections::HashMap,
-    fmt::Debug,
-    io::Error,
-    net::{IpAddr, SocketAddr},
-    os::fd::AsFd,
-    path::{Path, PathBuf},
-    sync::Arc,
+    net::SocketAddr,
+    path::PathBuf,
 };
 
-use tokio::{
-    fs::File,
-    io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufStream},
-    net::{TcpListener, TcpStream},
-    stream,
-    sync::Mutex,
-};
-use tokio_util::sync::CancellationToken;
 
 use crate::{
-    client::client::Client,
-    request::request::{Method, Request, State},
-    response::response::{Response, ResponseCode},
-    traits::config::Config,
-    Parsing::*,
+    request::request::Method, traits::config::Config, LocationBlock, ServerBlock
 };
 
-use super::location::Location;
+use super::{location::Location, parsing};
 
-/*--------------------------[ SERVER ]--------------------------*/
+
+/*---------------------------------------------------------------*/
+/*-------------------------[ SERVER ]----------------------------*/
+/*---------------------------------------------------------------*/
+
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct Server {
     internal: bool,
     default: bool,
@@ -83,201 +71,9 @@ impl Config for Server {
     fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)>{ &self.error_redirect }
 }
 
-/*------------------------------------------------------------------------------------------------------*/
-/*												SERVER													*/
-/*------------------------------------------------------------------------------------------------------*/
-
-impl Server {
-    // pub async fn run(mut self, ip: IpAddr, cancel_token: CancellationToken) -> Result<(), ()> {
-    //     if self.port.is_none() {
-    //         println!("------[No port to listen -> no bind]------");
-    //         return Ok(());
-    //     }
-
-    //     self.socket = Some(SocketAddr::new(ip, self.port.unwrap()));
-    //     let listener = match TcpListener::bind(self.socket.unwrap().clone()).await {
-    //         Ok(listener) => listener,
-    //         Err(e) => {
-    //             eprintln!("Server ({}): failed to bind: {e}", self.socket.unwrap());
-    //             return Err(());
-    //         }
-    //     };
-
-    //     println!(
-    //         "------[Server listening on {ip}::{}]------",
-    //         self.port.unwrap()
-    //     );
-    //     let server = Arc::new(self);
-
-    //     loop {
-    //         let cancel = cancel_token.clone();
-    //         tokio::select! {
-    //             Ok((stream, addr)) = listener.accept() => {
-    //                 println!("------[Connection accepted: {addr}]------");
-    //                 let server_instance = Arc::clone(&server);
-    //                 tokio::spawn( async move {
-    //                     server_instance.handle_client(stream).await
-    //                 });
-    //             }
-    //             _ = cancel.cancelled() => {
-    //                 println!("------[Server ({}): stop listening]------", server.socket.unwrap());
-    //                 return Ok(());
-    //             }
-    //         }
-    //     }
-    // }
-
-    // async fn handle_client(&self, mut stream: TcpStream) -> Result<(), Error> {
-    //     //	getting request
-    //     loop {
-    //         let request = match self.read_until_header_complete(&mut stream).await {
-    //             Ok(request) => request,
-    //             Err(err) => {
-    //                 if err.is_none() {
-    //                     // Request Parsing Error
-    //                     eprintln!("invalid header !");
-    //                     self.send_error_response_to(&mut stream, ResponseCode::new(400)).await?;
-    //                 } else {
-    //                     // i/o Error
-    //                     let err = err.unwrap();
-    //                     eprintln!("failed to read header !");
-    //                     self.send_error_response_to(
-    //                         &mut stream,
-    //                         ResponseCode::from_error(err.kind()),
-    //                     )
-    //                     .await?;
-    //                 }
-    //                 continue;
-    //             }
-    //         };
-
-	// 		eprintln!("---[ {:#?}", request);
-
-    //         match if let Some(location) = self.get_location(request.path()) {
-    //             eprintln!("---[ LOCATION");
-    //             location.send_response(&request, &mut stream).await
-    //         } else {
-    //             eprintln!("---[ SERVER");
-	// 			// eprintln!("---[ {:#?}", request);
-    //             self.send_response(&request, &mut stream).await
-    //         } {
-    //             Ok(_) => (),
-    //             Err(err) => {
-    //                 eprintln!("failed to send response: {} !", err.to_string());
-    //                 self.send_error_response_to(&mut stream, err).await?;
-    //                 continue;
-    //             }
-    //         }
-
-    //         if request.keep_connection_alive() == false {
-    //             break;
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
-
-    fn get_location(&self, to_find: &PathBuf) -> Option<&Location> {
-        let mut save: Option<(&PathBuf, &Location)> = None;
-
-        for (path, location) in &self.locations {
-            if path.is_absolute() {
-                if to_find
-                    .to_str()
-                    .unwrap()
-                    .starts_with(path.to_str().unwrap())
-                    == false
-                {
-                    continue;
-                }
-            } else {
-                if to_find.iter().any(|filename| filename.eq(path)) == false {
-                    continue;
-                }
-            }
-
-            if save.is_none() {
-                save = Some((path, location))
-            } else if save.unwrap().0 < path {
-                save = Some((path, location))
-            }
-        }
-
-        if save.is_none() {
-            None
-        } else {
-            Some(save.unwrap().1)
-        }
-    }
-
-    // async fn read_until_header_complete(
-    //     &self,
-    //     mut stream: &mut TcpStream,
-    // ) -> Result<Request, Option<Error>> {
-    //     let buffer = match Self::read_header(&mut stream).await {
-	// 		Ok(headers) => headers,
-	// 		Err(err) => return Err(Some(err)),
-	// 	};
-    //     let mut request = match Request::try_from(buffer) {
-    //         Ok(request) => request,
-    //         Err(_) => {
-    //             println!("Error: bad request");
-    //             // self.send_error_response_to(&mut stream);
-    //             return Err(None);
-    //         }
-    //     };
-
-    //     while request.state().is(State::OnHeader) {
-    //         let buffer = Self::read_from(&mut stream).await?;
-
-    //         match request.push(buffer) {
-    //             Ok(_) => (),
-    //             Err(_) => {
-    //                 println!("Error: bad request");
-    //                 return Err(None);
-    //             }
-    //         }
-    //     }
-
-    //     Ok(request)
-    // }
-
-	async fn read_header(stream: &mut TcpStream) -> io::Result<Vec<String>> {
-        let reader = BufReader::new(stream);
-		let mut lines = reader.lines();
-		let mut header = Vec::new();
-
-		while let Some(line) = lines.next_line().await? {
-			if line.is_empty() { return Ok(header) }
-			header.push(line);
-		}
-
-		Err(io::Error::new(std::io::ErrorKind::FileTooLarge, "header too large"))
-	}
-
-    async fn consume_body(&self, stream: &mut TcpStream) -> Result<(), Error> {
-        let mut buffer = [0; 65536];
-
-        loop {
-            match stream.try_read(&mut buffer) {
-                Ok(0) => break,
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    println!("would block !");
-                    continue;
-                }
-                Err(e) => {
-                    println!("failed to read: {e}");
-                    return Err(e);
-                }
-                _ => (),
-            }
-        }
-        Ok(())
-    }
-}
 
 /*---------------------------------------------------------------*/
-/*							  UTILS								 */
+/*--------------------------[ UTILS ]----------------------------*/
 /*---------------------------------------------------------------*/
 
 #[allow(dead_code)]
@@ -340,6 +136,7 @@ impl Server {
     // }
 }
 
+
 /*---------------------------------------------------------------*/
 /*----------------------[ CONFIG PARSING ]-----------------------*/
 /*---------------------------------------------------------------*/
@@ -364,7 +161,7 @@ impl Server {
                         "invalid field: root: root cannot be set with alias"
                     ));
                 } else {
-                    self.root = Some(Self::extract_root(infos)?)
+                    self.root = Some(parsing::extract_root(infos)?)
                 }
             }
             "alias" => {
@@ -373,11 +170,11 @@ impl Server {
                         "invalid field: alias: alias cannot be set with root"
                     ));
                 } else {
-                    self.alias = Some(Self::extract_alias(infos)?)
+                    self.alias = Some(parsing::extract_alias(infos)?)
                 }
             }
             "listen" => {
-                (self.port, self.default) = Self::extract_listen(infos)?;
+                (self.port, self.default) = parsing::extract_listen(infos)?;
             }
             "server_name" | "server_names" => {
                 if infos.len() < 1 {
@@ -391,16 +188,16 @@ impl Server {
                 }
             }
             "index" => {
-                self.index = Some(Self::extract_index(infos)?);
+                self.index = Some(parsing::extract_index(infos)?);
             }
             "auto_index" => {
-                self.auto_index = Self::extract_auto_index(infos)?;
+                self.auto_index = parsing::extract_auto_index(infos)?;
             }
             "client_max_body_size" => {
-                self.max_body_size = Some(Self::extract_max_body_size(infos)?);
+                self.max_body_size = Some(parsing::extract_max_body_size(infos)?);
             }
             "cgi" => {
-                let (extension, path) = Self::extract_cgi(infos)?;
+                let (extension, path) = parsing::extract_cgi(infos)?;
                 self.cgi.insert(extension, path);
             }
             "allowed_methods" => {
@@ -428,14 +225,12 @@ impl Server {
 					.collect::<Vec<Method>>();
 				self.methods.as_mut().unwrap().append(&mut method);
 
-				println!("METHOD ADDED: {:#?}", self.methods);
-
             }
             "return" => {
-                self.return_ = Some(Self::extract_return(infos)?);
+                self.return_ = Some(parsing::extract_return(infos)?);
             }
             "error_page" => {
-                let (pages, redirect) = Self::extract_error_page(infos)?;
+                let (pages, redirect) = parsing::extract_error_page(infos)?;
                 let hash = &mut self.error_pages;
                 if pages.is_some() {
                     pages

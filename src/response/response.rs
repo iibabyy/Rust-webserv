@@ -1,35 +1,35 @@
+use core::str;
 use std::{
     collections::HashMap,
-    fmt::format,
-    hash::Hash,
-    io::{Error, ErrorKind},
-    path::{Path, PathBuf},
+    io::{Error, ErrorKind}, usize,
 };
 
 use lazy_static::lazy_static;
 use tokio::{
     fs::File,
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{self, AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 
-use super::Body;
 
 #[derive(Default, Debug)]
 pub struct Response {
+	// header:
     code: ResponseCode,
     headers: HashMap<String, String>,
-    file: Option<File>,
-    body: Option<String>,
+
+	// body:
+    pub file: Option<File>,
+    content: Option<String>,
 }
 
 impl Response {
     pub fn new(code: ResponseCode) -> Response {
         Response {
-            code: code,
+            code,
             headers: HashMap::new(),
             file: None,
-            body: None,
+            content: None,
         }
     }
 
@@ -77,35 +77,109 @@ impl Response {
     //     })
     // }
 
-    async fn serialize_header(&self, file: File) -> Result<String, Error> {
-        let mut response: String = format!(
+	pub async fn send(&mut self, stream: &mut TcpStream) -> io::Result<()> {
+		match self.send_header(stream).await {
+			Ok(_) => (),
+			Err(None) => return Ok(()),	// end of stream
+			Err(Some(err)) => return Err(err),
+		}
+
+		self.send_body(stream).await?;
+
+		Ok(())
+
+	}
+
+	async fn send_header(&mut self, stream: &mut TcpStream) -> Result<(), Option<Error>> {
+		
+		let header = self.serialize_header().await;
+			
+		let buffer = header.as_bytes();
+		// let mut n = 0;
+		
+		eprintln!("Sending header [\n{header}\n]");
+
+		// while n < buffer.len() {
+			match stream.write_all(buffer).await {
+				Ok(_) => (),			// end of stream
+				// Ok(writen) => n += writen,
+				Err(err) => return Err(Some(err)),
+			};
+		// }/
+
+		Ok(())
+	}
+
+
+	async fn send_body(&mut self, stream: &mut TcpStream) -> io::Result<()> {
+		
+		if self.file.is_some() {
+			let mut buffer = [0; 65536];
+
+			loop {
+				let n = self.file.as_mut().unwrap().read(&mut buffer).await?;
+				if n == 0 { break }
+				stream.write_all(&buffer[..n]).await?;
+			}
+
+		} else if self.content.is_some() {
+			stream.write_all(&mut self.content.as_ref().unwrap().as_bytes()).await?
+		}
+
+		stream.write_all(&mut [b'\r', b'\n']).await?;
+		Ok(())
+	}
+
+    async fn serialize_header(&mut self) -> String {
+        let first_line: String = format!(
             "HTTP/1.1 {} {}\r\n",
             self.code.code(),
             self.code.to_string()
         );
 
-		if self.body.is_some() {
-			let file_length = format!(
-				"Content-Length: {}\r\n",
-				file.metadata().await?.len()
-			);
-			response = format!("{}{}", response, file_length);
-		}
+		let body_len = if self.file.is_some() || self.content.is_some() {
+			if self.file.is_some() {
+				self.file.as_ref().unwrap().metadata().await.unwrap().len() as usize
+			} else {
+				self.content.as_ref().unwrap().len()
+			}
 
-        let headers: String = self
+		} else {
+			self.content = Some(self.code.to_string().to_owned());
+			self.content.as_ref().unwrap().len()
+		};
+
+		self.headers.insert("Content-Length".to_owned(), body_len.to_string());
+
+        let mut headers: String = self
             .headers
             .iter()
             .map(|(key, value)| format!("{key}: {value}"))
             .collect::<Vec<String>>()
             .join("\r\n");
 
+		if headers.is_empty() == false {
+			headers.push_str("\r\n");
+		}
 
-        Ok(format!("{response}{headers}\r\n"))
+        format!("{first_line}{headers}\r\n")
     }
 
-    pub fn file(&mut self, file: File) {
+	pub fn add_header(&mut self, key: String, value: String) {
+		self.headers.insert(key, value);
+	}
+
+    pub fn file(mut self, file: File) -> Self {
         self.file = Some(file);
+		self
     }
+
+	#[allow(dead_code)]
+	pub fn content(mut self, content: String) -> Self {
+        self.content = Some(content);
+		self
+    }
+
 }
 
 #[derive(Clone, Debug)]
@@ -119,12 +193,13 @@ impl Default for ResponseCode {
     }
 }
 
+#[allow(dead_code)]
 impl ResponseCode {
     pub fn new(code: u16) -> ResponseCode {
         ResponseCode { code }
     }
 
-    pub fn from_error(err: ErrorKind) -> ResponseCode {
+	pub fn from_error(err: ErrorKind) -> ResponseCode {
         ResponseCode {
             code: match err {
                 ErrorKind::NotFound => 404,          // Not Found
@@ -159,6 +234,7 @@ impl ResponseCode {
     fn set_code(&mut self, code: u16) {
         self.code = code;
     }
+
 }
 
 lazy_static! {

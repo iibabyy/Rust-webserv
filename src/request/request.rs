@@ -1,11 +1,5 @@
-use std::{collections::HashMap, fmt::Display, io, path::PathBuf, slice::Iter, str::Split};
+use std::{collections::HashMap, io, path::PathBuf, slice::Iter};
 
-use tokio::{
-    io::{AsyncBufReadExt, AsyncReadExt, BufReader},
-    net::{TcpSocket, TcpStream},
-};
-
-use crate::traits::http_message::HttpMessage;
 
 /*------------------------------------------------------------------------------------*/
 /*										REQUEST										  */
@@ -67,8 +61,6 @@ impl TryFrom<&str> for Request {
     }
 }
 
-impl HttpMessage for Request {}
-
 impl Request {
     // pub fn push(&mut self, request: &str) -> Result<Option<String>, u16> {
     //     if self.state != State::Undefined && self.state != State::OnHeader {
@@ -101,38 +93,39 @@ impl Request {
     //     Ok(())
     // }
 
-	async fn from(mut stream: &mut TcpStream) -> Result<Self, RequestError> {
-		let headers = Self::read_header_from(&mut stream).await?;
+	// async fn from(mut stream: &mut TcpStream) -> Result<Self, RequestError> {
+	// 	let headers = Self::read_header_from(&mut stream).await?;
 
-		let request = match Self::deserialize(headers) {
-			Ok(request) => request,
-			Err(err) => return Err(RequestError::from(err)),
-		};
+	// 	let request = match Self::deserialize(headers) {
+	// 		Ok(request) => request,
+	// 		Err(err) => return Err(RequestError::from(err)),
+	// 	};
 
-		Ok(request)
-	}
+	// 	Ok(request)
+	// }
 
-	async fn read_header_from(mut stream: &mut TcpStream) -> io::Result<Vec<String>> {
-		let mut headers = vec![];
-		let mut size = 0;
+	// async fn read_header_from(mut stream: &mut TcpStream) -> io::Result<Vec<String>> {
+	// 	let mut headers = vec![];
+	// 	let mut size = 0;
 		
-		while size < 4096 {
-			stream.readable().await;
-			let reader = BufReader::new(&mut stream);
-			let mut lines = reader.lines();
+	// 	while size < 4096 {
+	// 		stream.readable().await;
+	// 		let reader = BufReader::new(&mut stream);
+	// 		let mut lines = reader.lines();
 			
-			while let Some(line) = lines.next_line().await? {
-				if line.is_empty() { return Ok(headers) }
-				size += line.as_bytes().len();
-				headers.push(line);
-			}
-		}
+	// 		while let Some(line) = lines.next_line().await? {
+	// 			if line.is_empty() { return Ok(headers) }
+	// 			size += line.as_bytes().len();
+	// 			headers.push(line);
+	// 		}
+	// 	}
 
-		Err(io::Error::new(io::ErrorKind::FileTooLarge, "header too large: expected less than 4096 bytes"))
+	// 	Err(io::Error::new(io::ErrorKind::FileTooLarge, "header too large: expected less than 4096 bytes"))
 
-	}
+	// }
 
     fn deserialize(headers: Vec<String>) -> Result<Self, String> {
+		eprintln!("Deserializing header...");
         let mut headers: Iter<'_, String> = headers.iter();
 		let first_line = headers.next();
         if first_line.is_none() {
@@ -199,7 +192,6 @@ impl Request {
     fn parse_first_line(&mut self, line: &str) -> Result<(), String> {
         let split: Vec<&str> = line.split_whitespace().collect();
 
-		eprintln!("Parsing first line");
         if split.len() != 3 {
             return Err(format!("invlid header: first line invalid: [{line}]"));
         } // Bad Request
@@ -210,7 +202,6 @@ impl Request {
             Err(_) => { Method::UNKNOWN }
         };
 
-		eprintln!("Parsing OK");
         self.path = PathBuf::from(split[1]);
         self.http_version = split[2].to_owned();
         Ok(())
@@ -233,6 +224,10 @@ impl Request {
 
     pub fn path(&self) -> &PathBuf {
         &self.path
+    }
+
+    pub fn set_path(&mut self, path: PathBuf) {
+        self.path = path
     }
 
     pub fn accept(&self) -> Option<&String> {

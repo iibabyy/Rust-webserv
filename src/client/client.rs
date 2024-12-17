@@ -1,11 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::net::TcpStream;
 
-use crate::request::request::{Request, State};
+use crate::request::request::Request;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

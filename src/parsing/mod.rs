@@ -1,8 +1,8 @@
-mod parsing;
+mod config_parsing;
 
 use std::{collections::HashMap, path::PathBuf};
 
-use parsing::config;
+use config_parsing::config;
 use tokio::{fs::File, io::AsyncReadExt as _};
 
 #[derive(Debug, Clone)]
@@ -28,14 +28,9 @@ pub async fn get_config(path: String) -> Vec<ServerBlock> {
     file.read_to_string(&mut content)
         .await
         .expect(format!("failed to read into {} !", path).as_str());
-    let servers = match config(content.as_str()) {
-        Ok((_, servers)) => servers,
-        Err(_) => {
-            eprintln!("----[Bad config file !]----");
-            panic!();
-        }
-    };
-    eprintln!("----[Parsing réussi !]----");
+    let (_, servers) = config(content.as_str()).expect("----[Bad config file !]----");
+
+	eprintln!("----[Parsing réussi !]----");
     servers
 }
 
