@@ -17,6 +17,7 @@ pub trait Config {
 
     fn auto_index(&self) -> bool;
     fn root(&self) -> Option<&PathBuf>;
+    fn upload_folder(&self) -> Option<&PathBuf>;
     fn alias(&self) -> Option<&PathBuf>;
     fn port(&self) -> Option<&u16>;
     fn index(&self) -> Option<&String>;
@@ -40,9 +41,43 @@ pub trait Config {
 		eprintln!("Building response...");
 		match request.method() {
 			&Method::GET => { return self.build_get_response(request).await },
+			// &Method::POST => { return self.build_post_response(request).await },
 			_ => return Err(Error::new(ErrorKind::Other, "method not implemented")), // not implemented
 		}
 	}
+
+	/*------------------------------------------------------------*/
+	/*-------------------------[ POST ]---------------------------*/
+	/*------------------------------------------------------------*/
+
+	// async fn build_post_response(&self, request: &Request) -> Result<Response, Error> {
+	// 	// eprintln!("Building POST response for '{}'...", request.path().display());
+
+	// 	// TODO!: upload body
+
+	// 	let mut response = Response::new(ResponseCode::from_code(204));	// no content
+	
+	// 	eprintln!("POST response build...");
+	
+	// 	Ok(response)
+
+	// }
+
+	// async fn upload_body(&self, request: &Request) -> io::Result<()> {
+
+	// 	if self.upload_folder().is_none() { return Err(io::Error::new(ErrorKind::NotFound, "No upload folder")) }
+	// 	let upload_folder = self.upload_folder().unwrap();
+		
+	// 	if upload_folder.is_dir() == false { return Err(io::Error::new(ErrorKind::NotFound, "Invalid upload folder")) }
+
+	// 	if request.get("Content-Type").is_none() {  } 
+
+	// 	Ok(())
+	// }
+
+	/*------------------------------------------------------------*/
+	/*-------------------------[ GET ]----------------------------*/
+	/*------------------------------------------------------------*/
 
 	async fn build_get_response(&self, request: &Request) -> Result<Response, Error> {
 		eprintln!("Building GET response for '{}'...", request.path().display());
@@ -129,7 +164,7 @@ pub trait Config {
 				return Err(ResponseCode::from_code(404));
 			}
 		}
-		
+
 		// TODO!: later in the code, when building response, check if directory, and list the directory if it's one
 
 		Ok(())
@@ -234,93 +269,3 @@ pub trait Config {
 
 
 }
-
-   // async fn send_response(
-    //     &self,
-    //     request: &Request,
-    //     stream: &mut TcpStream,
-    // ) -> Result<(), ResponseCode> {
-    //     let _ = match self.parse(&request) {
-    //         Ok(()) => (),
-    //         Err(err) => return Err(err),
-    //     };
-
-    //     match request.method() {
-    //         &Method::GET => self.send_get_response(&request, stream).await,
-    //         // &Method::POST => {},
-    //         // &Method::DELETE => {},
-    //         _ => Err(ResponseCode::new(501)), // not implemented
-    //     }
-    // }
-
-    // async fn send_get_response(
-    //     &self,
-    //     request: &Request,
-    //     stream: &mut TcpStream,
-    // ) -> Result<(), ResponseCode> {
-    //     let mut path = match self.get_final_path(request.path()) {
-	// 		Some(path) => path,
-	// 		None => return Err(ResponseCode::new(404)),
-	// 	};
-
-    //     if path.is_dir() {
-    //         // send_get_response_directory()
-    //         eprintln!("index: {}", self.index().as_ref().unwrap());
-    //         path = path.join(PathBuf::from(self.index().as_ref().unwrap()));
-    //     }
-
-    //     // if self.is_cgi(&request){
-    //     // 	// handle CGI GET methods
-    //     // 	todo!();
-    //     // }
-
-    //     eprintln!("----SENDING RESPONSE----");
-
-    //     // match self.consume_body(stream).await {
-    //     // 	Ok(_) => (),
-    //     // 	Err(err) => { return Err(ResponseCode::from_error(err.kind())) }
-    //     // }
-
-    //     let mut response = match Response::from_file(ResponseCode::new(200), path.as_path()).await {
-	// 		Err(err) => return Err(ResponseCode::from_error(err)),
-	// 		Ok(response) => response,
-	// 	};
-
-    //     match response.send_to(stream).await {
-    //         Ok(_) => Ok(()),
-    //         Err(err) => Err(ResponseCode::from_error(err.kind())),
-    //     }
-    // }
-
-    // async fn send_error_response_to(
-    //     &self,
-    //     stream: &mut TcpStream,
-    //     mut code: ResponseCode,
-    // ) -> Result<(), ErrorKind> {
-    //     let error_page = match self.error_pages().get(&code.code()) {
-    //         Some(page) => PathBuf::from(page),
-    //         None => {
-	// 			code = ResponseCode::new(400);
-	// 			PathBuf::from("error_pages/404.html") // TODO: need to have one default page by error (cgi ?)
-	// 		}
-	// 	};
-
-    //     let response = self.get_final_path(&error_page);
-
-	// 	let mut response = match response {
-	// 		Some(path) => {
-	// 			Response::from_file(code, path.as_path()).await?
-	// 		}
-	// 		None => {
-	// 			Response::from_file(ResponseCode::new(400), PathBuf::from("error_pages/404.html").as_path()).await?		// final path not found
-	// 		}
-	// 	};
-
-	// 	match response.send_to(stream).await {
-	// 		Ok(_) => Ok(()),
-	// 		Err(err) => Err(err.kind()),
-	// 	};
-
-	// 	Ok(())
-
-    // }

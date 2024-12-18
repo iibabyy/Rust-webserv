@@ -19,9 +19,10 @@ use super::server::Server;
 pub struct Location {
     internal: bool,
     exact_path: bool,
-    auto_index: Option<bool>,
+    auto_index: bool,
     path: PathBuf,
     root: Option<PathBuf>,
+    upload_folder: Option<PathBuf>,
     alias: Option<PathBuf>,
     max_body_size: Option<u64>,
     redirect: Option<String>,
@@ -36,59 +37,23 @@ pub struct Location {
 }
 
 impl Config for Location {
-    fn path(&self) -> &PathBuf {
-        &self.path
-    }
-    fn internal(&self) -> bool {
-        self.internal | self.server.as_ref().unwrap().internal()
-    }
-    fn methods(&self) -> Option<&Vec<Method>> {
-        self.methods.as_ref()
-    }
-    fn locations(&self) -> Option<&HashMap<PathBuf, Location>> {
-        None
-    }
-    fn root(&self) -> Option<&PathBuf> {
-        self.root.as_ref()
-    }
-    fn auto_index(&self) -> bool {
-        self.auto_index
-            .unwrap_or(self.server.as_ref().unwrap().auto_index())
-    }
-	fn alias(&self) -> Option<&PathBuf> {
-		self.alias.as_ref()
-	}
-    fn cgi(&self) -> &HashMap<String, PathBuf> {
-        &self.cgi
-    }
-    fn error_pages(&self) -> &HashMap<u16, String> {
-        &self.error_pages
-    }
-    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)> {
-        &self.error_redirect
-    }
-    fn max_body_size(&self) -> Option<&u64> {
-        self.max_body_size.as_ref()
-    }
-    fn name(&self) -> Option<&Vec<String>> {
-        None
-    }
-    fn index(&self) -> Option<&String> {
-        self.index.as_ref()
-    }
-    fn port(&self) -> Option<&u16> {
-        None
-    }
-    fn is_location(&self) -> bool {
-        true
-    }
-    fn return_(&self) -> Option<&(u16, Option<String>)> {
-        if let Some(n) = self.return_.as_ref() {
-            Some(n)
-        } else {
-            self.server.as_ref().unwrap().return_()
-        }
-    }
+    fn path(&self) -> &PathBuf/*----------------------------------*/{ &self.path }
+	fn internal(&self) -> bool/*----------------------------------*/{ self.internal }
+    fn auto_index(&self) -> bool/*--------------------------------*/{ self.auto_index }
+    fn is_location(&self) -> bool/*-------------------------------*/{ false }
+    fn index(&self) -> Option<&String>/*--------------------------*/{ self.index.as_ref() }
+    fn root(&self) -> Option<&PathBuf>/*--------------------------*/{ self.root.as_ref() }
+	fn alias(&self) -> Option<&PathBuf>/*-------------------------*/{ self.alias.as_ref() }
+    fn max_body_size(&self) -> Option<&u64>/*---------------------*/{ self.max_body_size.as_ref() }
+    fn methods(&self) -> Option<&Vec<Method>>/*-------------------*/{ self.methods.as_ref() }
+    fn cgi(&self) -> &HashMap<String, PathBuf>/*------------------*/{ &self.cgi }
+    fn upload_folder(&self) -> Option<&PathBuf>/*-----------------*/{ self.upload_folder.as_ref() }
+    fn error_pages(&self) -> &HashMap<u16, String>/*--------------*/{ &self.error_pages }
+    fn return_(&self) -> Option<&(u16, Option<String>)>/*---------*/{ self.return_.as_ref() }
+    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)>{ &self.error_redirect }
+    fn port(&self) -> Option<&u16>/*------------------------------*/{ None }
+    fn name(&self) -> Option<&Vec<String>>/*----------------------*/{ None }
+    fn locations(&self) -> Option<&HashMap<PathBuf, Location>>/*--*/{ None }
 }
 
 #[allow(dead_code)]
@@ -102,11 +67,12 @@ impl Location {
             max_body_size: None,
             return_: None,
             root: None,
+			upload_folder: None,
             alias: None,
             index: None,
             methods: None,
             redirect: None,
-            auto_index: None,
+            auto_index: false,
             internal: false,
             infos: HashMap::new(),
             cgi: HashMap::new(),
@@ -144,6 +110,9 @@ impl Location {
 						new_location.alias = Some(parsing::extract_alias(infos)?)
 					}
 				}
+				"upload_folder" => {
+					new_location.upload_folder = Some(parsing::extract_upload_folder(infos)?)
+				}
                 "index" => {
                     let index = parsing::extract_index(infos);
                     match index {
@@ -167,7 +136,7 @@ impl Location {
                                 e
                             ))
                         }
-                        Ok(is_true) => new_location.auto_index = Some(is_true),
+                        Ok(is_true) => new_location.auto_index = is_true,
                     }
                 }
                 "client_max_body_size" => {
@@ -270,10 +239,13 @@ impl Location {
 
     fn complete_with_server_directives(&mut self, server: &Server) {
         self.internal = self.internal || server.internal();
-        self.auto_index = self.auto_index.or(Some(server.auto_index()));
+        self.auto_index = self.auto_index || server.auto_index();
 
         if self.root.is_none() && server.root().is_some() {
             self.root = Some(server.root().unwrap().clone());
+        }
+		if self.upload_folder.is_none() && server.upload_folder().is_some() {
+            self.upload_folder = Some(server.upload_folder().unwrap().clone());
         }
         if self.index.is_none() && server.index().is_some() {
             self.index = Some(server.index().unwrap().clone());

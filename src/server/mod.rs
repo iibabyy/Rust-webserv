@@ -14,7 +14,7 @@ pub mod parsing {
 		use std::{collections::HashMap, path::PathBuf};
 	
 		use nom::InputIter;
-	
+
 		pub fn extract_root(value: Vec<String>) -> Result<PathBuf, String> {
 			if value.len() != 1 {
 				return Err("invalid field: root".to_owned());
@@ -27,7 +27,7 @@ pub mod parsing {
 	
 			Ok(path)
 		}
-	
+
 		pub fn extract_alias(value: Vec<String>) -> Result<PathBuf, String> {
 			if value.len() != 1 {
 				return Err("invalid field: root".to_owned());
@@ -41,7 +41,20 @@ pub mod parsing {
 	
 			Ok(path)
 		}
+
+		pub fn extract_upload_folder(value: Vec<String>) -> Result<PathBuf, String> {
+			if value.len() != 1 {
+				return Err("invalid field: upload_folder".to_owned());
+			}
 	
+			let path = PathBuf::from(&value[0]);
+			if path.is_dir() == false {
+				return Err(value[0].clone() + ": invalid upload folder");
+			}
+
+			Ok(path)
+		}
+
 		pub fn extract_max_body_size(value: Vec<String>) -> Result<u64, String> {
 			if value.len() != 1 {
 				return Err("invalid field: client_max_body_size".to_owned());
@@ -191,7 +204,7 @@ pub mod parsing {
 				)),
 			}
 		}
-	
+
 		pub fn extract_cgi(value: Vec<String>) -> Result<(String, PathBuf), String> {
 			if value.len() != 2 {
 				return Err("invalid field: cgi".to_owned());
@@ -209,6 +222,6 @@ pub mod parsing {
 		pub fn is_redirect_status_code(code: u16) -> bool {
 			code == 301 || code == 302 || code == 303 || code == 307
 		}
-		
+
 	}
 	

@@ -6,7 +6,7 @@
 /*   By: ibaby <ibaby@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/12/15 05:34:36 by ibaby             #+#    #+#             */
-/*   Updated: 2024/12/18 22:00:58 by ibaby            ###   ########.fr       */
+/*   Updated: 2024/12/18 22:27:36 by ibaby            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,7 +40,7 @@ pub struct Server {
     socket: Option<SocketAddr>,
     max_body_size: Option<u64>,
     root: Option<PathBuf>,
-    alias: Option<PathBuf>,
+    upload_folder: Option<PathBuf>,
     index: Option<String>,
     return_: Option<(u16, Option<String>)>,
     name: Option<Vec<String>>,
@@ -60,11 +60,12 @@ impl Config for Server {
     fn port(&self) -> Option<&u16>/*------------------------------*/{ self.port.as_ref() }
     fn index(&self) -> Option<&String>/*--------------------------*/{ self.index.as_ref() }
     fn root(&self) -> Option<&PathBuf>/*--------------------------*/{ self.root.as_ref() }
-	fn alias(&self) -> Option<&PathBuf>/*-------------------------*/{ self.alias.as_ref() }
+	fn alias(&self) -> Option<&PathBuf>/*-------------------------*/{ None }
     fn name(&self) -> Option<&Vec<String>>/*----------------------*/{ self.name.as_ref() }
     fn max_body_size(&self) -> Option<&u64>/*---------------------*/{ self.max_body_size.as_ref() }
     fn methods(&self) -> Option<&Vec<Method>>/*-------------------*/{ self.methods.as_ref() }
     fn cgi(&self) -> &HashMap<String, PathBuf>/*------------------*/{ &self.cgi }
+    fn upload_folder(&self) -> Option<&PathBuf>/*-----------------*/{ self.upload_folder.as_ref() }
     fn error_pages(&self) -> &HashMap<u16, String>/*--------------*/{ &self.error_pages }
     fn return_(&self) -> Option<&(u16, Option<String>)>/*---------*/{ self.return_.as_ref() }
     fn locations(&self) -> Option<&HashMap<PathBuf, Location>>/*--*/{ Some(&self.locations) }
@@ -83,7 +84,7 @@ impl Server {
             port: None,
             socket: None,
             root: None,
-            alias: None,
+			upload_folder: None,
             path: PathBuf::from("/"),
             max_body_size: None,
             index: None,
@@ -156,22 +157,16 @@ impl Server {
     fn add_directive(&mut self, name: String, infos: Vec<String>) -> Result<(), String> {
         match name.as_str() {
             "root" => {
-                if self.alias.is_some() {
-                    return Err(format!(
-                        "invalid field: root: root cannot be set with alias"
-                    ));
-                } else {
-                    self.root = Some(parsing::extract_root(infos)?)
-                }
+                if self.root.is_some() { println!("Warning: root: duplicated value") };
+				self.root = Some(parsing::extract_root(infos)?)
             }
             "alias" => {
-                if self.root.is_some() {
-                    return Err(format!(
-                        "invalid field: alias: alias cannot be set with root"
-                    ));
-                } else {
-                    self.alias = Some(parsing::extract_alias(infos)?)
-                }
+				return Err(format!(
+					"invalid field: alias: alias can only be set in locations"
+				));
+            }
+			"upload_folder" => {
+				self.upload_folder = Some(parsing::extract_upload_folder(infos)?)
             }
             "listen" => {
                 (self.port, self.default) = parsing::extract_listen(infos)?;
