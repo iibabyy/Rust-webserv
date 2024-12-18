@@ -15,7 +15,6 @@ pub trait Config {
 	/*-----------------------[ GETTERS ]--------------------------*/
 	/*------------------------------------------------------------*/
 
-
     fn auto_index(&self) -> bool;
     fn root(&self) -> Option<&PathBuf>;
     fn alias(&self) -> Option<&PathBuf>;
@@ -54,7 +53,7 @@ pub trait Config {
 
 		eprintln!("GET response build...");
 		let mut response = Response::
-			new(ResponseCode::new(200))
+			new(ResponseCode::default())
 			.file(file);
 
 		response.add_header("Content-Type".to_owned(), "text/html".to_owned());
@@ -66,29 +65,18 @@ pub trait Config {
 	#[allow(non_snake_case)]
 	async fn get_GET_request_file(&self, request: &Request) -> io::Result<File> {
 
+		eprintln!("trying to open '{}'...", request.path().display());
 		if request.path().is_file() {
 			match File::open(request.path()).await {
-				Ok(file) => return Ok(file),
-				Err(err) => return Err(err),
+				Ok(file) => Ok(file),
+				Err(err) => Err(err),
 			}
+		} else if request.path().is_dir() {
+			// TODO!: List directory
+			todo!("List directory");
+		} else {
+			Err(Error::new(ErrorKind::NotFound, "file not found"))
 		}
-		
-		let auto_index: bool = self.auto_index() == true && request.path().is_dir();
-
-		if auto_index == true && self.index().is_some() {
-			let path = format!(
-				"{}/{}",
-				request.path().to_str().unwrap(),
-				self.index().unwrap(),
-			);
-
-			match File::open(path).await {
-				Ok(file) => return Ok(file),
-				Err(err) => return Err(err),
-			}
-		}
-		
-		Err(Error::new(ErrorKind::NotFound, "file not found"))
 	}
 
 	/*------------------------------------------------------------*/
@@ -105,7 +93,7 @@ pub trait Config {
 		self.parse_method(request)?;
 
 		if request.content_length()  > self.max_body_size() {
-			return Err(ResponseCode::new(413));
+			return Err(ResponseCode::from_code(413));
 		}
 
 		self.format_path(request)?;
@@ -114,6 +102,40 @@ pub trait Config {
 	}
 
 	fn format_path(&self, request: &mut Request) -> Result<(), ResponseCode> {
+
+		self.add_root_or_alias(request)?;
+		self.add_index_if_needed(request)?;
+		// let new_path = 
+		Ok(())
+	}
+
+	fn add_index_if_needed(&self, request: &mut Request) -> Result<(), ResponseCode> {
+
+		if request.path().is_dir() == false { return Ok(()) }	// not a dir -> no index needed
+
+		if self.auto_index() == true {
+			if self.index().is_some() {
+				let path = request.path().to_str().unwrap();
+				let path = format!(
+					"{}/{}",
+					path,
+					self.index().unwrap(),
+				);
+
+				let path = PathBuf::from(path);
+				request.set_path(path);
+
+			} else {	// auto index on but no index
+				return Err(ResponseCode::from_code(404));
+			}
+		}
+		
+		// TODO!: later in the code, when building response, check if directory, and list the directory if it's one
+
+		Ok(())
+	}
+
+	fn add_root_or_alias(&self, request: &mut Request) -> Result<(), ResponseCode> {
 		let path = if self.root().is_some() {
 			let mut path = self.root().unwrap().clone();
 			path = PathBuf::from(format!(
@@ -134,8 +156,8 @@ pub trait Config {
 			);
 			
 			PathBuf::from(path)
-		} else { return Err(ResponseCode::new(404)) };
-		
+		} else { return Err(ResponseCode::from_code(404)) };	// no root nor alias
+
 		request.set_path(path);
 		Ok(())
 	}
@@ -161,18 +183,18 @@ pub trait Config {
         let methods = self.methods();
 		if methods.is_none() {
 			eprintln!("NO METHODS ALLOWED !");
-            return Err(ResponseCode::new(405));
+            return Err(ResponseCode::from_code(405));
         } // No method allowed
         if !methods.as_ref().unwrap().contains(request.method()) {
 			eprintln!("METHOD NOT ALLOWED !");
-            return Err(ResponseCode::new(405));
+            return Err(ResponseCode::from_code(405));
         } // Ok
 
         return match request.method() {
             // check if implemented (wip)
             &Method::GET	=> Ok(()),
 
-            _ 				=> Err(ResponseCode::new(501)), // Not implemented
+            _ 				=> Err(ResponseCode::from_code(501)), // Not implemented
         };
     }
 

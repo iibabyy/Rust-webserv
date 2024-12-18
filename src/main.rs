@@ -54,12 +54,6 @@ async fn main() {
 
     listen_signals(&cancel_token);
 
-    // println!(
-    //     "--------------------[ CONFIG ]--------------------\n\n{:#?}",
-    //     servers
-    // );
-    // println!("--------------------------------------------------\n");
-
     let mut task = JoinSet::new();
     for serv in listeners {
         task.spawn(

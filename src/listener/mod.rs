@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::{self, Error}, net::IpAddr};
 use tokio::{io::AsyncReadExt, net::{TcpListener, TcpStream}};
 use tokio_util::sync::CancellationToken;
 
-use crate::{request::request::Request, server::server::Server, traits::config::Config};
+use crate::{request::request::Request, response::response::{Response, ResponseCode}, server::server::Server, traits::config::Config};
 
 pub struct Listener {
 	listener: TcpListener,
@@ -130,12 +130,19 @@ impl Listener {
 		match Self::send_response(server, stream, &request).await {
 			Ok(_) => (),
 			Err(err) => {
-				// send error response ?
 				println!("Error: {err}");
+				Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
 			}
 		}
 
 		request.keep_connection_alive() == true
+
+	}
+
+	async fn send_error_response(stream: &mut TcpStream, code: ResponseCode) {
+		let mut response = Response::new(code);
+
+		let _ = response.send(stream).await;
 
 	}
 
