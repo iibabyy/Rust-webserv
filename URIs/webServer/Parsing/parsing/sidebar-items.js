@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["block","config","directive","has_values","identifier","location_block","modifier","skip_spaces","skip_whitespaces","space","symbols","whitespace"]};
