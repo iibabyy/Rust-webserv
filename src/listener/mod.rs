@@ -1,6 +1,6 @@
-use std::{collections::HashMap, io::{self, Error}, net::IpAddr};
+use std::{collections::HashMap, io::{self, Error}, net::{IpAddr, Shutdown}};
 
-use tokio::{io::AsyncReadExt, net::{TcpListener, TcpStream}};
+use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::{TcpListener, TcpStream}};
 use tokio_util::sync::CancellationToken;
 
 use crate::{request::request::Request, response::response::{Response, ResponseCode}, server::server::Server, traits::config::Config};
@@ -66,6 +66,7 @@ impl Listener {
 					let server_instance = self.servers.clone();
 					tokio::spawn( async move {
 						let _ = Self::handle_stream(stream, &server_instance).await;
+						eprintln!("------[ End of Stream ]------");
 					});
 				}
 				_ = cancel.cancelled() => {
@@ -85,34 +86,32 @@ impl Listener {
 				Err(err) => {
 					return Ok(eprintln!("Error: {} -> closing conection", err));
 				}
+				Ok(0) => { break },
 				Ok(n) => n,
 			};
-			
-			if n == 0 {
-				return Ok(eprintln!("End of stream: closing conection"));
-			}	// end of connection
 
 			raw.push_str(std::str::from_utf8(&buffer[..n])?);
 
-			let mut temp = None;
 			while let Some((header, raw_left)) = raw.split_once("\r\n\r\n") {
 				eprintln!("\n\n\nIncoming request");
-				if Self::handle_request(header, &mut stream, servers).await == false { return Ok(()) }
-				temp = Some(raw_left);
+				if Self::handle_request(header, &mut stream, servers).await == false { break }
+				raw = raw_left.to_owned();
 			}
 
-			if temp.is_some() { raw = temp.unwrap().to_owned() }
-
 		}
+
+		stream.shutdown().await?;
+
+		Ok(())
 	}
 
 	async fn handle_request(header: &str, stream: &mut TcpStream, servers: &Vec<Server>) -> bool {
 		let mut request = match Request::try_from(header) {
 			Ok(request) => request,
 			Err(err) => {
-				eprintln!("Bad request: {err}");
+				Self::send_error_response(stream, err).await;
+				return true
 				// send error response bad request
-				todo!()
 			}
 		};
 
@@ -122,7 +121,7 @@ impl Listener {
 			Ok(_) => (),
 			Err(err) => {
 				eprintln!("Error: {}", err.to_string());
-				// TODO: send error response
+				Self::send_error_response(stream, err).await;
 				return request.keep_connection_alive() == true
 			}
 		}

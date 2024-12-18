@@ -1,5 +1,7 @@
 use std::{collections::HashMap, io, path::PathBuf, slice::Iter};
 
+use crate::response::response::ResponseCode;
+
 
 /*------------------------------------------------------------------------------------*/
 /*										REQUEST										  */
@@ -34,7 +36,7 @@ impl From<String> for RequestError {
 	}
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Request {
     method: Method,
@@ -50,13 +52,31 @@ pub struct Request {
     keep_connection_alive: bool,
 }
 
+impl Default for Request {
+	fn default() -> Self {
+		Request {
+			method: Method::default(),
+			http_version: String::default(),
+			path: PathBuf::default(),
+			accept: Option::default(),
+			host: Option::default(),
+			headers: HashMap::default(),
+			content_length: Option::default(),
+			raw_body: Option::default(),
+			raw_header: String::default(),
+			state: State::default(),
+			keep_connection_alive: true,
+		}
+	}
+}
+
 impl TryFrom<&str> for Request {
-    type Error = String;
+    type Error = ResponseCode;
     fn try_from(value: &str) -> Result<Request, Self::Error> {
 		let headers = value.split("\r\n").map(|str| str.to_string()).collect();
 		match Self::deserialize(headers) {
 			Ok(request) => Ok(request),
-			Err(err) => Err(err),
+			Err(err) => Err(ResponseCode::new(400, err.as_str())),
 		}
     }
 }
@@ -131,7 +151,7 @@ impl Request {
         if first_line.is_none() {
             return Err("empty header".to_owned());
         }
-
+ 
 		let mut request = Request::default();
 
         request.parse_first_line(first_line.unwrap())?;

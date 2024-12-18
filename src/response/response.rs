@@ -49,7 +49,7 @@ impl Response {
 		let buffer = header.as_bytes();
 		// let mut n = 0;
 		
-		eprintln!("Sending header [\n{header}\n]");
+		// eprintln!("Sending header [{header}]");
 
 		match stream.write_all(buffer).await {
 			Ok(_) => (),
@@ -87,8 +87,7 @@ impl Response {
 		);
 
 		let body_len = if self.file.is_some() {
-				self.file.as_ref().unwrap().metadata().await.unwrap().len() as usize
-
+			self.file.as_ref().unwrap().metadata().await.unwrap().len() as usize + 2
 		} else {
 			self.content.len()
 		};
