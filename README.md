@@ -22,5 +22,5 @@ Il vous est possible de la modifier via le fichier conf.conf
    ```bash
    git clone https://github.com/iibabyy/Rust-webServer.git
    cd webServer
-   unzip URIs.zip -d URIs
+   unzip URIs.zip
    cargo run --release
