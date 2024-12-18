@@ -1,6 +1,7 @@
 
 
 pub mod location;
+pub mod config;
 pub mod server;
 
 

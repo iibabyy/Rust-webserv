@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::{self, Error}, net::{IpAddr, Shutdown}};
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::{TcpListener, TcpStream}};
 use tokio_util::sync::CancellationToken;
 
-use crate::{request::request::Request, response::response::{Response, ResponseCode}, server::server::Server, traits::config::Config};
+use crate::{request::Request, response::response::{Response, ResponseCode}, server::{config::Config, server::Server}};
 
 pub struct Listener {
 	listener: TcpListener,

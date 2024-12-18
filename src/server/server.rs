@@ -6,7 +6,7 @@
 /*   By: ibaby <ibaby@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/12/15 05:34:36 by ibaby             #+#    #+#             */
-/*   Updated: 2024/12/18 00:33:42 by ibaby            ###   ########.fr       */
+/*   Updated: 2024/12/18 22:00:58 by ibaby            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,10 +18,10 @@ use std::{
 
 
 use crate::{
-    request::request::Method, traits::config::Config, LocationBlock, ServerBlock
+    request::Method, LocationBlock, ServerBlock
 };
 
-use super::{location::Location, parsing};
+use super::{config::Config, location::Location, parsing};
 
 
 /*---------------------------------------------------------------*/

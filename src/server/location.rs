@@ -5,11 +5,10 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 
-use super::parsing;
+use super::{config::Config, parsing};
 
 use crate::{
-    request::request::Method,
-    traits::config::Config,
+    request::Method,
     LocationBlock,
 };
 

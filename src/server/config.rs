@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::{self, Error, ErrorKind}, path::PathBuf};
 use tokio::fs::File;
 
 use crate::{
-    request::request::{Method, Request},
+    request::{Method, Request},
     response::response::{Response, ResponseCode},
     server::location::Location,
 };
@@ -192,9 +192,9 @@ pub trait Config {
 
         return match request.method() {
             // check if implemented (wip)
-            &Method::GET	=> Ok(()),
+            &Method::UNKNOWN => Err(ResponseCode::from_code(501)), // Not allowed
+            _ => Ok(()),
 
-            _ 				=> Err(ResponseCode::from_code(501)), // Not implemented
         };
     }
 

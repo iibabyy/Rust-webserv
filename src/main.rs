@@ -7,7 +7,6 @@ mod request;
 #[allow(dead_code)]
 mod response;
 mod server;
-mod traits;
 mod listener;
 
 use listener::Listener;
