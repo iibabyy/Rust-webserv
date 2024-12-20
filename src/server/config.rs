@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::{self, Error, ErrorKind}, path::PathBuf};
 
-use tokio::fs::File;
+use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
 
 use crate::{
     request::{Method, Request},
@@ -32,6 +32,64 @@ pub trait Config {
     fn return_(&self) -> Option<&(u16, Option<String>)>;
     fn internal(&self) -> bool;
     fn is_location(&self) -> bool;
+
+	/*------------------------------------------------------------*/
+	/*-------------------------[ Body ]---------------------------*/
+	/*------------------------------------------------------------*/
+
+	async fn handle_body_request(&self, request: &Request, stream: &mut TcpStream, raw_left: &str) -> Result<String, ResponseCode> {
+
+		match request.method() {
+			&Method::OPTIONS => self.upload_body(request, stream, raw_left).await,
+			_ => Self::consume_body(request, stream, raw_left).await,
+		}
+	}
+
+	async fn upload_body(&self, request: &Request, stream: &mut TcpStream, raw_left: &str) -> Result<String, ResponseCode> {
+		todo!()
+	}
+
+	async fn consume_body(request: &Request, stream: &mut TcpStream, raw_left: &str) -> Result<String, ResponseCode> {
+
+		if request.content_length().is_none() { return Ok(raw_left.to_string()) }
+
+		let content_length = request.content_length().unwrap().clone() as usize;
+
+		if raw_left.len() >= content_length { return Ok(raw_left[content_length..].to_string()) }
+
+		let length_missing = content_length - raw_left.len();
+
+		match Self::consume_stream(stream, length_missing).await {
+			Ok(str) => Ok(str),
+			Err(err) => Err(ResponseCode::from_error(&err)),
+		}
+	}
+	
+	async fn consume_stream(stream: &mut TcpStream, len: usize) -> io::Result<String> {
+		let mut buffer = [0; 65536];
+		let mut read = 0;
+
+		while read < len - 65536 {
+			match stream.read(&mut buffer).await {
+				Ok(n) => read += n,
+				Err(err) => return Err(err),
+			}
+		}
+
+		let mut buffer = String::new();
+
+		while read < len {
+			match stream.read_to_string(&mut buffer).await {
+				Ok(n) => read += n,
+				Err(err) => return Err(err),
+			}
+		}
+
+		let end = read - len;
+
+		return Ok(buffer[end..].to_string())
+
+	}
 
 	/*------------------------------------------------------------*/
 	/*-----------------------[ Response ]-------------------------*/

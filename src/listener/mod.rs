@@ -94,8 +94,10 @@ impl Listener {
 
 			while let Some((header, raw_left)) = raw.split_once("\r\n\r\n") {
 				eprintln!("\n\n\nIncoming request");
-				if Self::handle_request(header, &mut stream, servers).await == false { break }
-				raw = raw_left.to_owned();
+				raw = match Self::handle_request(header, &mut stream, servers, raw_left).await {
+					Some(raw_left) => raw_left,
+					None => return Ok(())
+				}
 			}
 
 		}
@@ -105,12 +107,12 @@ impl Listener {
 		Ok(())
 	}
 
-	async fn handle_request(header: &str, stream: &mut TcpStream, servers: &Vec<Server>) -> bool {
+	async fn handle_request(header: &str, stream: &mut TcpStream, servers: &Vec<Server>, raw_left: &str) -> Option<String> {
 		let mut request = match Request::try_from(header) {
 			Ok(request) => request,
 			Err(err) => {
 				Self::send_error_response(stream, err).await;
-				return true
+				return Some(raw_left.to_string())
 				// send error response bad request
 			}
 		};
@@ -122,19 +124,29 @@ impl Listener {
 			Err(err) => {
 				eprintln!("Error: {}", err.to_string());
 				Self::send_error_response(stream, err).await;
-				return request.keep_connection_alive() == true
+				return if request.keep_connection_alive() == true { Some(raw_left.to_string()) } else { None }
 			}
 		}
+
+		let raw_left = match server.handle_body_request(&request, stream, raw_left).await {
+			Ok(raw_left) => raw_left,
+			Err(err) => {
+				println!("Error: {}", err.to_string());
+				Self::send_error_response(stream, err).await;
+				return if request.keep_connection_alive() == true { Some(raw_left.to_string()) } else { None }
+			}
+		};
 
 		match Self::send_response(server, stream, &request).await {
 			Ok(_) => (),
 			Err(err) => {
 				println!("Error: {err}");
 				Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
+				return if request.keep_connection_alive() == true { Some(raw_left.to_string()) } else { None }
 			}
 		}
 
-		request.keep_connection_alive() == true
+		Some(raw_left)
 
 	}
 
