@@ -41,10 +41,12 @@ pub struct Request {
     method: Method,
     http_version: String,
     path: PathBuf,
+    query: Option<String>,
     accept: Option<String>,
     host: Option<String>,
     headers: HashMap<String, String>,
     content_length: Option<usize>,
+    content_type: Option<String>,
     raw_body: Option<String>,
     raw_header: String,
     state: State,
@@ -54,6 +56,7 @@ pub struct Request {
 impl Default for Request {
     fn default() -> Self {
         Request {
+            query: Option::default(),
             method: Method::default(),
             http_version: String::default(),
             path: PathBuf::default(),
@@ -61,6 +64,7 @@ impl Default for Request {
             host: Option::default(),
             headers: HashMap::default(),
             content_length: Option::default(),
+            content_type: Option::default(),
             raw_body: Option::default(),
             raw_header: String::default(),
             state: State::default(),
@@ -82,34 +86,34 @@ impl TryFrom<&str> for Request {
 
 impl Request {
     // pub fn push(&mut self, request: &str) -> Result<Option<String>, u16> {
-    //     if self.state != State::Undefined && self.state != State::OnHeader {
-    //         todo!()
-    //     }
+    //	 if self.state != State::Undefined && self.state != State::OnHeader {
+    //		 todo!()
+    //	 }
 
     // 	self.state = State::OnHeader;
-    //     let (header, rest) = match request.split_once("\r\n\r\n") {
-    //         None => {
-    //             // Header not finished
-    //             self.raw_header.push_str(&request);
-    //             return Ok(None);
-    //         }
-    //         Some((header, rest)) => (header, rest),
-    //     };
-    //     // Header complete
-    //     self.raw_header.push_str(header);
-    //     if rest.is_empty() == false {
+    //	 let (header, rest) = match request.split_once("\r\n\r\n") {
+    //		 None => {
+    //			 // Header not finished
+    //			 self.raw_header.push_str(&request);
+    //			 return Ok(None);
+    //		 }
+    //		 Some((header, rest)) => (header, rest),
+    //	 };
+    //	 // Header complete
+    //	 self.raw_header.push_str(header);
+    //	 if rest.is_empty() == false {
     // 		self.raw_body = Some(rest.to_owned());
-    //     }
+    //	 }
 
-    //     self.deserialize()?;
-    //     self.raw_header.clear();
-    //     self.state = if self.raw_body.is_some() {
+    //	 self.deserialize()?;
+    //	 self.raw_header.clear();
+    //	 self.state = if self.raw_body.is_some() {
     // 		State::OnBody
-    //     } else {
-    //         State::Finished
-    //     };
+    //	 } else {
+    //		 State::Finished
+    //	 };
 
-    //     Ok(())
+    //	 Ok(())
     // }
 
     // async fn from(mut stream: &mut TcpStream) -> Result<Self, RequestError> {
@@ -195,16 +199,23 @@ impl Request {
                         self.accept = Some(format!("{} {value}", self.accept.as_ref().unwrap()))
                     } // concat a space (' ') and the value if already exists
                 }
-				"Content-Length" => {
-					if self.content_length.is_some() {
-						return Err("invalid header: Content-Length: duplicated header".to_string())
-					} else {
-						self.content_length = match value.trim().parse::<usize>() {
+                "Content-Length" => {
+                    if self.content_length.is_some() {
+                        return Err("invalid header: Content-Length: duplicated header".to_string());
+                    } else {
+                        self.content_length = match value.trim().parse::<usize>() {
 							Ok(len) => Some(len),
 							Err(err) => return Err(format!("invalid header: Content-Length ({value}): failed to convert value: {err}")),
 						};
-					}
-				}
+                    }
+                }
+                "Content-Type" => {
+                    if self.content_type.is_some() {
+                        return Err("invalid header: Content-type: duplicated header".to_string());
+                    } else {
+                        self.content_type = Some(value.to_string());
+                    }
+                }
                 _ => {
                     self.headers
                         .entry(name.to_owned()) // finding key name
@@ -231,13 +242,23 @@ impl Request {
             Err(_) => Method::UNKNOWN,
         };
 
+		
         self.path = PathBuf::from(split[1]);
         self.http_version = split[2].to_owned();
         Ok(())
     }
 
-    pub fn get(&self, header: String) -> Option<&String> {
-        match self.headers.get(&header) {
+	fn add_path(&mut self, path: &str) {
+		if let Some(query_pos) = path.find("?") {
+			self.query = Some(path[query_pos + 1..].to_string());
+			self.path = PathBuf::from(&path[..query_pos]);
+		} else {
+			self.path = PathBuf::from(path)
+		}
+	}
+
+    pub fn get(&self, header: &str) -> Option<&String> {
+        match self.headers.get(header) {
             None => None,
             Some(value) => Some(value),
         }
@@ -278,6 +299,18 @@ impl Request {
     pub fn http_version(&self) -> &str {
         &self.http_version
     }
+
+    pub fn content_type(&self) -> Option<&String> {
+        self.content_type.as_ref()
+    }
+	
+	pub fn headers(&self) -> &HashMap<String, String> {
+		&self.headers
+	}
+	
+	pub fn query(&self) -> Option<&String> {
+			self.query.as_ref()
+		}
 }
 
 /*------------------------------------------------------------------------------------*/
@@ -355,6 +388,21 @@ impl Method {
             _ => Err("unknown method".to_string()),
         }
     }
+
+	pub fn to_string(&self) -> String {
+		match self {
+            Method::GET => "GET".to_owned(),
+            Method::POST => "POST".to_owned(),
+            Method::DELETE => "DELETE".to_owned(),
+            Method::HEAD => "HEAD".to_owned(),
+            Method::PUT => "PUT".to_owned(),
+            Method::CONNECT => "CONNECT".to_owned(),
+            Method::PATCH => "PATCH".to_owned(),
+            Method::TRACE => "TRACE".to_owned(),
+            Method::OPTIONS => "OPTIONS".to_owned(),
+            Method::UNDEFINED | Method::UNKNOWN => "UNKNOWN".to_owned(),
+        }
+	}
 }
 
 /*------------------------------------------------------------------------------------*/
@@ -376,6 +424,54 @@ impl State {
     }
     pub fn is_not(&self, other: Self) -> bool {
         self.eq(&other)
+    }
+}
+
+mod utils {
+    use lazy_static::lazy_static;
+    use std::collections::HashMap;
+
+    lazy_static! {
+        static ref CONTENT_TYPE_TO_EXT: HashMap<&'static str, &'static str> = {
+            let mut m = HashMap::new();
+            m.insert("application/json", "json");
+            m.insert("application/javascript", "js");
+            m.insert("text/html", "html");
+            m.insert("text/css", "css");
+            m.insert("text/plain", "txt");
+            m.insert("text/csv", "csv");
+            m.insert("image/jpeg", "jpg");
+            m.insert("image/png", "png");
+            m.insert("image/gif", "gif");
+            m.insert("image/svg+xml", "svg");
+            m.insert("audio/mpeg", "mp3");
+            m.insert("audio/wav", "wav");
+            m.insert("video/mp4", "mp4");
+            m.insert("application/pdf", "pdf");
+            m.insert("application/xml", "xml");
+            m.insert("application/zip", "zip");
+            m
+        };
+        static ref EXT_TO_CONTENT_TYPE: HashMap<&'static str, &'static str> = {
+            let mut m = HashMap::new();
+            for (content_type, ext) in CONTENT_TYPE_TO_EXT.iter() {
+                m.insert(*ext, *content_type);
+            }
+            m
+        };
+    }
+
+    /// Convertit un Content-Type en extension de fichier
+    /// Retourne None si le Content-Type n'est pas reconnu
+    pub fn content_type_to_extension(content_type: &str) -> Option<&'static str> {
+        CONTENT_TYPE_TO_EXT.get(content_type).copied()
+    }
+
+    /// Convertit une extension de fichier en Content-Type
+    /// Retourne None si l'extension n'est pas reconnue
+    pub fn extension_to_content_type(extension: &str) -> Option<&'static str> {
+        let ext = extension.trim_start_matches('.');
+        EXT_TO_CONTENT_TYPE.get(ext).copied()
     }
 }
 
@@ -456,42 +552,3 @@ impl State {
 // codes_responses[525] = "SSL Handshake Failed";
 // codes_responses[526] = "Invalid SSL Certificate";
 // codes_responses[527] = "Railgun Error";
-
-/*-----------------CONTENT-TYPES-----------------*/
-
-// contentTypes[".txt"] = "text/plain";
-// contentTypes[".html"] = "text/html";
-// contentTypes[".htm"] = "text/html";
-// contentTypes[".css"] = "text/css";
-// contentTypes[".js"] = "application/javascript";
-// contentTypes[".json"] = "application/json";
-// contentTypes[".xml"] = "application/xml";
-// contentTypes[".pdf"] = "application/pdf";
-// contentTypes[".zip"] = "application/zip";
-// contentTypes[".gz"] = "application/gzip";
-// contentTypes[".doc"] = "application/msword";
-// contentTypes[".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-// contentTypes[".xls"] = "application/vnd.ms-excel";
-// contentTypes[".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-// contentTypes[".ppt"] = "application/vnd.ms-powerpoint";
-// contentTypes[".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-// contentTypes[".jpg"] = "image/jpeg";
-// contentTypes[".jpeg"] = "image/jpeg";
-// contentTypes[".png"] = "image/png";
-// contentTypes[".gif"] = "image/gif";
-// contentTypes[".webp"] = "image/webp";
-// contentTypes[".svg"] = "image/svg+xml";
-// contentTypes[".mp3"] = "audio/mpeg";
-// contentTypes[".ogg"] = "audio/ogg";
-// contentTypes[".wav"] = "audio/wav";
-// contentTypes[".mp4"] = "video/mp4";
-// contentTypes[".webm"] = "video/webm";
-// contentTypes[".ogv"] = "video/ogg";
-// contentTypes[".tar"] = "application/x-tar";
-// contentTypes[".7z"] = "application/x-7z-compressed";
-// contentTypes[".rar"] = "application/x-rar-compressed";
-// contentTypes[".md"] = "text/markdown";
-// contentTypes[".rtf"] = "application/rtf";
-// contentTypes[".sh"] = "application/x-sh";
-// contentTypes[".py"] = "application/x-python";
-// contentTypes[".jar"] = "application/x-java-archive";
