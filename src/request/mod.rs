@@ -44,7 +44,7 @@ pub struct Request {
     accept: Option<String>,
     host: Option<String>,
     headers: HashMap<String, String>,
-    content_length: Option<u64>,
+    content_length: Option<usize>,
     raw_body: Option<String>,
     raw_header: String,
     state: State,
@@ -195,6 +195,16 @@ impl Request {
                         self.accept = Some(format!("{} {value}", self.accept.as_ref().unwrap()))
                     } // concat a space (' ') and the value if already exists
                 }
+				"Content-Length" => {
+					if self.content_length.is_some() {
+						return Err("invalid header: Content-Length: duplicated header".to_string())
+					} else {
+						self.content_length = match value.trim().parse::<usize>() {
+							Ok(len) => Some(len),
+							Err(err) => return Err(format!("invalid header: Content-Length ({value}): failed to convert value: {err}")),
+						};
+					}
+				}
                 _ => {
                     self.headers
                         .entry(name.to_owned()) // finding key name
@@ -257,7 +267,7 @@ impl Request {
         self.host.as_ref()
     }
 
-    pub fn content_length(&self) -> Option<&u64> {
+    pub fn content_length(&self) -> Option<&usize> {
         self.content_length.as_ref()
     }
 

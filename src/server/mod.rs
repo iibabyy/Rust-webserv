@@ -45,18 +45,18 @@ pub mod parsing {
 
         let path = PathBuf::from(&value[0]);
         if path.is_dir() == false {
-            return Err(value[0].clone() + ": invalid upload folder");
+            return Err(format!("invalid upload folder: {}", value[0]));
         }
 
         Ok(path)
     }
 
-    pub fn extract_max_body_size(value: Vec<String>) -> Result<u64, String> {
+    pub fn extract_max_body_size(value: Vec<String>) -> Result<usize, String> {
         if value.len() != 1 {
             return Err("invalid field: client_max_body_size".to_owned());
         }
 
-        let num = value[0].parse::<u64>();
+        let num = value[0].parse::<usize>();
 
         return match num {
             Ok(num) => Ok(num),

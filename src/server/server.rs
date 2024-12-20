@@ -6,7 +6,7 @@
 /*   By: ibaby <ibaby@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/12/15 05:34:36 by ibaby             #+#    #+#             */
-/*   Updated: 2024/12/18 22:27:36 by ibaby            ###   ########.fr       */
+/*   Updated: 2024/12/20 11:43:12 by ibaby            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,7 +29,7 @@ pub struct Server {
     port: Option<u16>,
     path: PathBuf,
     socket: Option<SocketAddr>,
-    max_body_size: Option<u64>,
+    max_body_size: Option<usize>,
     root: Option<PathBuf>,
     upload_folder: Option<PathBuf>,
     index: Option<String>,
@@ -71,12 +71,12 @@ impl Config for Server {
     fn name(&self) -> Option<&Vec<String>> /*----------------------*/ {
         self.name.as_ref()
     }
-    fn max_body_size(&self) -> Option<&u64> /*---------------------*/ {
-        self.max_body_size.as_ref()
-    }
     fn methods(&self) -> Option<&Vec<Method>> /*-------------------*/ {
-        self.methods.as_ref()
+		self.methods.as_ref()
     }
+	fn max_body_size(&self) -> Option<&usize> /*---------------------*/ {
+		self.max_body_size.as_ref()
+	}
     fn cgi(&self) -> &HashMap<String, PathBuf> /*------------------*/ {
         &self.cgi
     }

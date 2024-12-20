@@ -4,7 +4,11 @@ use std::{
     path::PathBuf,
 };
 
-use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
+use tokio::{
+    fs::{File, OpenOptions},
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 use crate::{
     request::{Method, Request},
@@ -24,7 +28,7 @@ pub trait Config {
     fn alias(&self) -> Option<&PathBuf>;
     fn port(&self) -> Option<&u16>;
     fn index(&self) -> Option<&String>;
-    fn max_body_size(&self) -> Option<&u64>; //-
+    fn max_body_size(&self) -> Option<&usize>; //-
     fn name(&self) -> Option<&Vec<String>>;
     fn path(&self) -> &PathBuf;
     fn methods(&self) -> Option<&Vec<Method>>;
@@ -45,9 +49,13 @@ pub trait Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &str,
-    ) -> Result<String, ResponseCode> {
+    ) -> Result<String, Error> {
+        if request.content_length().is_none() {
+            return Ok(raw_left.to_string());
+        }
+
         match request.method() {
-            &Method::OPTIONS => self.upload_body(request, stream, raw_left).await,
+            &Method::POST => self.upload_body(request, stream, raw_left).await,
             _ => Self::consume_body(request, stream, raw_left).await,
         }
     }
@@ -57,20 +65,79 @@ pub trait Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &str,
-    ) -> Result<String, ResponseCode> {
-        todo!()
+    ) -> Result<String, Error> {
+        if self.upload_folder().is_none() {
+            return Err(Error::new(ErrorKind::NotFound, "No upload folder"));
+        }
+        let upload_folder = self.upload_folder().unwrap();
+
+        if upload_folder.exists() == false {
+            return Err(Error::new(ErrorKind::NotFound, "Upload folder not found"));
+        }
+
+        let file = format!("{}/test", upload_folder.to_str().unwrap());
+
+        let mut file = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(file)
+            .await
+        {
+            Ok(file) => file,
+            Err(err) => return Err(err),
+        };
+
+        self.upload(&mut file, stream, request, raw_left).await
+    }
+
+    async fn upload(
+        &self,
+        file: &mut File,
+        stream: &mut TcpStream,
+        request: &Request,
+        raw_left: &str,
+    ) -> Result<String, Error> {
+        let mut buffer = [0; 65536];
+        let mut read = 0;
+        let mut n = 0;
+        let body_len = request.content_length().unwrap().clone() as usize;
+
+        if body_len <= raw_left.len() {
+            file.write(&raw_left.as_bytes()[..body_len]).await?;
+            return Ok(raw_left[body_len..].to_string());
+        } else {
+            file.write(raw_left.as_bytes()).await?;
+            read += raw_left.len();
+        }
+
+        while read < body_len {
+            n = match stream.read_exact(&mut buffer).await {
+                Ok(n) => n,
+                Err(err) => return Err(err),
+            };
+
+            read += n;
+
+            if read > body_len {
+                file.write_all(&buffer[..(n - (read - body_len))]).await?;
+            } else {
+                file.write_all(&buffer[..n]).await?;
+            }
+        }
+
+        let end = n - (read - body_len);
+
+        return Ok(String::from_utf8_lossy(&buffer[end..]).to_string());
     }
 
     async fn consume_body(
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &str,
-    ) -> Result<String, ResponseCode> {
-        if request.content_length().is_none() {
-            return Ok(raw_left.to_string());
-        }
-
-        let content_length = request.content_length().unwrap().clone() as usize;
+    ) -> Result<String, Error> {
+        let content_length = request.content_length().unwrap().to_owned() as usize;
 
         if raw_left.len() >= content_length {
             return Ok(raw_left[content_length..].to_string());
@@ -80,33 +147,27 @@ pub trait Config {
 
         match Self::consume_stream(stream, length_missing).await {
             Ok(str) => Ok(str),
-            Err(err) => Err(ResponseCode::from_error(&err)),
+            Err(err) => Err(err),
         }
     }
 
     async fn consume_stream(stream: &mut TcpStream, len: usize) -> io::Result<String> {
         let mut buffer = [0; 65536];
         let mut read = 0;
-
-        while read < len - 65536 {
-            match stream.read(&mut buffer).await {
-                Ok(n) => read += n,
-                Err(err) => return Err(err),
-            }
-        }
-
-        let mut buffer = String::new();
-
+        let mut n = 0;
         while read < len {
-            match stream.read_to_string(&mut buffer).await {
-                Ok(n) => read += n,
+            n = match stream.read(&mut buffer).await {
+                Ok(n) => n,
                 Err(err) => return Err(err),
-            }
+            };
+
+            read += n;
         }
 
-        let end = read - len;
+        let read_too_much = read - len;
+        let end = n - read_too_much;
 
-        return Ok(buffer[end..].to_string());
+        return Ok(String::from_utf8_lossy(&buffer[end..]).to_string());
     }
 
     /*------------------------------------------------------------*/
@@ -117,7 +178,7 @@ pub trait Config {
         eprintln!("Building response...");
         match request.method() {
             &Method::GET => return self.build_get_response(request).await,
-            // &Method::POST => { return self.build_post_response(request).await },
+            &Method::POST => { return self.build_get_response(request).await },
             _ => return Err(Error::new(ErrorKind::Other, "method not implemented")), // not implemented
         }
     }

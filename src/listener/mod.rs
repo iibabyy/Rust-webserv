@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{self, Error},
+    io::{self, Error, ErrorKind},
     net::{IpAddr, Shutdown},
 };
 
@@ -137,6 +137,7 @@ impl Listener {
         let mut request = match Request::try_from(header) {
             Ok(request) => request,
             Err(err) => {
+                eprintln!("Error: deserializing header: {}", err.to_string());
                 Self::send_error_response(stream, err).await;
                 return Some(raw_left.to_string());
                 // send error response bad request
@@ -148,7 +149,7 @@ impl Listener {
         match server.parse_request(&mut request) {
             Ok(_) => (),
             Err(err) => {
-                eprintln!("Error: {}", err.to_string());
+                eprintln!("Error: parsing request: {}", err.to_string());
                 Self::send_error_response(stream, err).await;
                 return if request.keep_connection_alive() == true {
                     Some(raw_left.to_string())
@@ -161,23 +162,30 @@ impl Listener {
         let raw_left = match server.handle_body_request(&request, stream, raw_left).await {
             Ok(raw_left) => raw_left,
             Err(err) => {
-                println!("Error: {}", err.to_string());
-                Self::send_error_response(stream, err).await;
-                return if request.keep_connection_alive() == true {
-                    Some(raw_left.to_string())
-                } else {
-                    None
-                };
+                match err.kind() {
+                    ErrorKind::UnexpectedEof => return None, // end of stream
+
+                    _ => {
+                        println!("Error: handling body: {}", err.to_string());
+                        Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
+
+						if request.keep_connection_alive() == true {
+                            return Some(raw_left.to_string()) // keep stream alive
+                        } else {
+                            return None // kill stream
+                        };
+                    }
+                }
             }
         };
 
         match Self::send_response(server, stream, &request).await {
             Ok(_) => (),
             Err(err) => {
-                println!("Error: {err}");
+                println!("Error: sending response: {err}");
                 Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
                 return if request.keep_connection_alive() == true {
-                    Some(raw_left.to_string())
+                    Some(raw_left)
                 } else {
                     None
                 };

@@ -20,7 +20,7 @@ pub struct Location {
     root: Option<PathBuf>,
     upload_folder: Option<PathBuf>,
     alias: Option<PathBuf>,
-    max_body_size: Option<u64>,
+    max_body_size: Option<usize>,
     redirect: Option<String>,
     index: Option<String>,
     return_: Option<(u16, Option<String>)>,
@@ -54,17 +54,17 @@ impl Config for Location {
     fn alias(&self) -> Option<&PathBuf> /*-------------------------*/ {
         self.alias.as_ref()
     }
-    fn max_body_size(&self) -> Option<&u64> /*---------------------*/ {
-        self.max_body_size.as_ref()
-    }
     fn methods(&self) -> Option<&Vec<Method>> /*-------------------*/ {
-        self.methods.as_ref()
+		self.methods.as_ref()
     }
+	fn max_body_size(&self) -> Option<&usize> /*---------------------*/ {
+		self.max_body_size.as_ref()
+	}
     fn cgi(&self) -> &HashMap<String, PathBuf> /*------------------*/ {
-        &self.cgi
+		&self.cgi
     }
     fn upload_folder(&self) -> Option<&PathBuf> /*-----------------*/ {
-        self.upload_folder.as_ref()
+		self.upload_folder.as_ref()
     }
     fn error_pages(&self) -> &HashMap<u16, String> /*--------------*/ {
         &self.error_pages
