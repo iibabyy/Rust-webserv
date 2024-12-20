@@ -30,7 +30,7 @@ pub async fn get_config(path: String) -> Vec<ServerBlock> {
         .expect(format!("failed to read into {} !", path).as_str());
     let (_, servers) = config(content.as_str()).expect("----[Bad config file !]----");
 
-	eprintln!("----[Parsing réussi !]----");
+    eprintln!("----[Parsing réussi !]----");
     servers
 }
 

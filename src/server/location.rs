@@ -4,13 +4,9 @@
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-
 use super::{config::Config, parsing};
 
-use crate::{
-    request::Method,
-    LocationBlock,
-};
+use crate::{request::Method, LocationBlock};
 
 use super::server::Server;
 
@@ -37,23 +33,57 @@ pub struct Location {
 }
 
 impl Config for Location {
-    fn path(&self) -> &PathBuf/*----------------------------------*/{ &self.path }
-	fn internal(&self) -> bool/*----------------------------------*/{ self.internal }
-    fn auto_index(&self) -> bool/*--------------------------------*/{ self.auto_index }
-    fn is_location(&self) -> bool/*-------------------------------*/{ false }
-    fn index(&self) -> Option<&String>/*--------------------------*/{ self.index.as_ref() }
-    fn root(&self) -> Option<&PathBuf>/*--------------------------*/{ self.root.as_ref() }
-	fn alias(&self) -> Option<&PathBuf>/*-------------------------*/{ self.alias.as_ref() }
-    fn max_body_size(&self) -> Option<&u64>/*---------------------*/{ self.max_body_size.as_ref() }
-    fn methods(&self) -> Option<&Vec<Method>>/*-------------------*/{ self.methods.as_ref() }
-    fn cgi(&self) -> &HashMap<String, PathBuf>/*------------------*/{ &self.cgi }
-    fn upload_folder(&self) -> Option<&PathBuf>/*-----------------*/{ self.upload_folder.as_ref() }
-    fn error_pages(&self) -> &HashMap<u16, String>/*--------------*/{ &self.error_pages }
-    fn return_(&self) -> Option<&(u16, Option<String>)>/*---------*/{ self.return_.as_ref() }
-    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)>{ &self.error_redirect }
-    fn port(&self) -> Option<&u16>/*------------------------------*/{ None }
-    fn name(&self) -> Option<&Vec<String>>/*----------------------*/{ None }
-    fn locations(&self) -> Option<&HashMap<PathBuf, Location>>/*--*/{ None }
+    fn path(&self) -> &PathBuf /*----------------------------------*/ {
+        &self.path
+    }
+    fn internal(&self) -> bool /*----------------------------------*/ {
+        self.internal
+    }
+    fn auto_index(&self) -> bool /*--------------------------------*/ {
+        self.auto_index
+    }
+    fn is_location(&self) -> bool /*-------------------------------*/ {
+        false
+    }
+    fn index(&self) -> Option<&String> /*--------------------------*/ {
+        self.index.as_ref()
+    }
+    fn root(&self) -> Option<&PathBuf> /*--------------------------*/ {
+        self.root.as_ref()
+    }
+    fn alias(&self) -> Option<&PathBuf> /*-------------------------*/ {
+        self.alias.as_ref()
+    }
+    fn max_body_size(&self) -> Option<&u64> /*---------------------*/ {
+        self.max_body_size.as_ref()
+    }
+    fn methods(&self) -> Option<&Vec<Method>> /*-------------------*/ {
+        self.methods.as_ref()
+    }
+    fn cgi(&self) -> &HashMap<String, PathBuf> /*------------------*/ {
+        &self.cgi
+    }
+    fn upload_folder(&self) -> Option<&PathBuf> /*-----------------*/ {
+        self.upload_folder.as_ref()
+    }
+    fn error_pages(&self) -> &HashMap<u16, String> /*--------------*/ {
+        &self.error_pages
+    }
+    fn return_(&self) -> Option<&(u16, Option<String>)> /*---------*/ {
+        self.return_.as_ref()
+    }
+    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)> {
+        &self.error_redirect
+    }
+    fn port(&self) -> Option<&u16> /*------------------------------*/ {
+        None
+    }
+    fn name(&self) -> Option<&Vec<String>> /*----------------------*/ {
+        None
+    }
+    fn locations(&self) -> Option<&HashMap<PathBuf, Location>> /*--*/ {
+        None
+    }
 }
 
 #[allow(dead_code)]
@@ -67,7 +97,7 @@ impl Location {
             max_body_size: None,
             return_: None,
             root: None,
-			upload_folder: None,
+            upload_folder: None,
             alias: None,
             index: None,
             methods: None,
@@ -84,12 +114,12 @@ impl Location {
                 "root" => {
                     // ROOT
                     if new_location.root.is_some() {
-						return Err(format!(
-							"invalid field: root: root cannot be set with alias"
-						));
-					}
+                        return Err(format!(
+                            "invalid field: root: root cannot be set with alias"
+                        ));
+                    }
 
-					let root = parsing::extract_root(infos);
+                    let root = parsing::extract_root(infos);
                     match root {
                         Err(e) => {
                             return Err(format!(
@@ -101,18 +131,18 @@ impl Location {
                         Ok(path) => new_location.root = Some(path),
                     }
                 }
-				"alias" => {
-					if new_location.root.is_some() {
-						return Err(format!(
-							"invalid field: alias: alias cannot be set with root"
-						));
-					} else {
-						new_location.alias = Some(parsing::extract_alias(infos)?)
-					}
-				}
-				"upload_folder" => {
-					new_location.upload_folder = Some(parsing::extract_upload_folder(infos)?)
-				}
+                "alias" => {
+                    if new_location.root.is_some() {
+                        return Err(format!(
+                            "invalid field: alias: alias cannot be set with root"
+                        ));
+                    } else {
+                        new_location.alias = Some(parsing::extract_alias(infos)?)
+                    }
+                }
+                "upload_folder" => {
+                    new_location.upload_folder = Some(parsing::extract_upload_folder(infos)?)
+                }
                 "index" => {
                     let index = parsing::extract_index(infos);
                     match index {
@@ -244,7 +274,7 @@ impl Location {
         if self.root.is_none() && server.root().is_some() {
             self.root = Some(server.root().unwrap().clone());
         }
-		if self.upload_folder.is_none() && server.upload_folder().is_some() {
+        if self.upload_folder.is_none() && server.upload_folder().is_some() {
             self.upload_folder = Some(server.upload_folder().unwrap().clone());
         }
         if self.index.is_none() && server.index().is_some() {
@@ -281,8 +311,8 @@ impl Location {
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
-	
-	pub fn exact_path(&self) -> bool {
-		self.exact_path
-	}
+
+    pub fn exact_path(&self) -> bool {
+        self.exact_path
+    }
 }

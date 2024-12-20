@@ -2,38 +2,37 @@ use std::{collections::HashMap, io, path::PathBuf, slice::Iter};
 
 use crate::response::response::ResponseCode;
 
-
 /*------------------------------------------------------------------------------------*/
 /*										REQUEST										  */
 /*------------------------------------------------------------------------------------*/
 
 #[derive(Debug, Clone, Default)]
 pub struct RequestError {
-	invalid_request: bool,
-	io_error: bool,
-	io_error_kind: Option<io::ErrorKind>,
-	error_string: String,
+    invalid_request: bool,
+    io_error: bool,
+    io_error_kind: Option<io::ErrorKind>,
+    error_string: String,
 }
 
 impl From<io::Error> for RequestError {
-	fn from(value: io::Error) -> Self {
-		let mut request = RequestError::default();
-		request.io_error = true;
-		request.io_error_kind = Some(value.kind());
-		request.error_string = value.to_string();
+    fn from(value: io::Error) -> Self {
+        let mut request = RequestError::default();
+        request.io_error = true;
+        request.io_error_kind = Some(value.kind());
+        request.error_string = value.to_string();
 
-		request
-	}
+        request
+    }
 }
 
 impl From<String> for RequestError {
-	fn from(value: String) -> Self {
-		let mut request = RequestError::default();
-		request.invalid_request = true;
-		request.error_string = value;
+    fn from(value: String) -> Self {
+        let mut request = RequestError::default();
+        request.invalid_request = true;
+        request.error_string = value;
 
-		request
-	}
+        request
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,31 +52,31 @@ pub struct Request {
 }
 
 impl Default for Request {
-	fn default() -> Self {
-		Request {
-			method: Method::default(),
-			http_version: String::default(),
-			path: PathBuf::default(),
-			accept: Option::default(),
-			host: Option::default(),
-			headers: HashMap::default(),
-			content_length: Option::default(),
-			raw_body: Option::default(),
-			raw_header: String::default(),
-			state: State::default(),
-			keep_connection_alive: true,
-		}
-	}
+    fn default() -> Self {
+        Request {
+            method: Method::default(),
+            http_version: String::default(),
+            path: PathBuf::default(),
+            accept: Option::default(),
+            host: Option::default(),
+            headers: HashMap::default(),
+            content_length: Option::default(),
+            raw_body: Option::default(),
+            raw_header: String::default(),
+            state: State::default(),
+            keep_connection_alive: true,
+        }
+    }
 }
 
 impl TryFrom<&str> for Request {
     type Error = ResponseCode;
     fn try_from(value: &str) -> Result<Request, Self::Error> {
-		let headers = value.split("\r\n").map(|str| str.to_string()).collect();
-		match Self::deserialize(headers) {
-			Ok(request) => Ok(request),
-			Err(err) => Err(ResponseCode::new(400, err.as_str())),
-		}
+        let headers = value.split("\r\n").map(|str| str.to_string()).collect();
+        match Self::deserialize(headers) {
+            Ok(request) => Ok(request),
+            Err(err) => Err(ResponseCode::new(400, err.as_str())),
+        }
     }
 }
 
@@ -86,8 +85,8 @@ impl Request {
     //     if self.state != State::Undefined && self.state != State::OnHeader {
     //         todo!()
     //     }
-		
-	// 	self.state = State::OnHeader;
+
+    // 	self.state = State::OnHeader;
     //     let (header, rest) = match request.split_once("\r\n\r\n") {
     //         None => {
     //             // Header not finished
@@ -99,13 +98,13 @@ impl Request {
     //     // Header complete
     //     self.raw_header.push_str(header);
     //     if rest.is_empty() == false {
-	// 		self.raw_body = Some(rest.to_owned());
+    // 		self.raw_body = Some(rest.to_owned());
     //     }
 
     //     self.deserialize()?;
     //     self.raw_header.clear();
     //     self.state = if self.raw_body.is_some() {
-	// 		State::OnBody
+    // 		State::OnBody
     //     } else {
     //         State::Finished
     //     };
@@ -113,46 +112,46 @@ impl Request {
     //     Ok(())
     // }
 
-	// async fn from(mut stream: &mut TcpStream) -> Result<Self, RequestError> {
-	// 	let headers = Self::read_header_from(&mut stream).await?;
+    // async fn from(mut stream: &mut TcpStream) -> Result<Self, RequestError> {
+    // 	let headers = Self::read_header_from(&mut stream).await?;
 
-	// 	let request = match Self::deserialize(headers) {
-	// 		Ok(request) => request,
-	// 		Err(err) => return Err(RequestError::from(err)),
-	// 	};
+    // 	let request = match Self::deserialize(headers) {
+    // 		Ok(request) => request,
+    // 		Err(err) => return Err(RequestError::from(err)),
+    // 	};
 
-	// 	Ok(request)
-	// }
+    // 	Ok(request)
+    // }
 
-	// async fn read_header_from(mut stream: &mut TcpStream) -> io::Result<Vec<String>> {
-	// 	let mut headers = vec![];
-	// 	let mut size = 0;
-		
-	// 	while size < 4096 {
-	// 		stream.readable().await;
-	// 		let reader = BufReader::new(&mut stream);
-	// 		let mut lines = reader.lines();
-			
-	// 		while let Some(line) = lines.next_line().await? {
-	// 			if line.is_empty() { return Ok(headers) }
-	// 			size += line.as_bytes().len();
-	// 			headers.push(line);
-	// 		}
-	// 	}
+    // async fn read_header_from(mut stream: &mut TcpStream) -> io::Result<Vec<String>> {
+    // 	let mut headers = vec![];
+    // 	let mut size = 0;
 
-	// 	Err(io::Error::new(io::ErrorKind::FileTooLarge, "header too large: expected less than 4096 bytes"))
+    // 	while size < 4096 {
+    // 		stream.readable().await;
+    // 		let reader = BufReader::new(&mut stream);
+    // 		let mut lines = reader.lines();
 
-	// }
+    // 		while let Some(line) = lines.next_line().await? {
+    // 			if line.is_empty() { return Ok(headers) }
+    // 			size += line.as_bytes().len();
+    // 			headers.push(line);
+    // 		}
+    // 	}
+
+    // 	Err(io::Error::new(io::ErrorKind::FileTooLarge, "header too large: expected less than 4096 bytes"))
+
+    // }
 
     fn deserialize(headers: Vec<String>) -> Result<Self, String> {
-		eprintln!("Deserializing header...");
+        eprintln!("Deserializing header...");
         let mut headers: Iter<'_, String> = headers.iter();
-		let first_line = headers.next();
+        let first_line = headers.next();
         if first_line.is_none() {
             return Err("empty header".to_owned());
         }
- 
-		let mut request = Request::default();
+
+        let mut request = Request::default();
 
         request.parse_first_line(first_line.unwrap())?;
         request.parse_other_lines(headers)?;
@@ -219,7 +218,7 @@ impl Request {
         let method = split[0];
         self.method = match Method::try_from_str(method) {
             Ok(method) => method,
-            Err(_) => { Method::UNKNOWN }
+            Err(_) => Method::UNKNOWN,
         };
 
         self.path = PathBuf::from(split[1]);
@@ -354,7 +353,7 @@ impl Method {
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub enum State {
-	#[default]
+    #[default]
     Undefined,
     OnHeader,
     OnBody,

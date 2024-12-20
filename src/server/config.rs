@@ -1,4 +1,8 @@
-use std::{collections::HashMap, io::{self, Error, ErrorKind}, path::PathBuf};
+use std::{
+    collections::HashMap,
+    io::{self, Error, ErrorKind},
+    path::PathBuf,
+};
 
 use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
 
@@ -10,10 +14,9 @@ use crate::{
 
 #[allow(dead_code)]
 pub trait Config {
- 
-	/*------------------------------------------------------------*/
-	/*-----------------------[ GETTERS ]--------------------------*/
-	/*------------------------------------------------------------*/
+    /*------------------------------------------------------------*/
+    /*-----------------------[ GETTERS ]--------------------------*/
+    /*------------------------------------------------------------*/
 
     fn auto_index(&self) -> bool;
     fn root(&self) -> Option<&PathBuf>;
@@ -21,11 +24,11 @@ pub trait Config {
     fn alias(&self) -> Option<&PathBuf>;
     fn port(&self) -> Option<&u16>;
     fn index(&self) -> Option<&String>;
-    fn max_body_size(&self) -> Option<&u64>;	//-
+    fn max_body_size(&self) -> Option<&u64>; //-
     fn name(&self) -> Option<&Vec<String>>;
     fn path(&self) -> &PathBuf;
     fn methods(&self) -> Option<&Vec<Method>>;
-    fn cgi(&self) -> &HashMap<String, PathBuf>;	//-
+    fn cgi(&self) -> &HashMap<String, PathBuf>; //-
     fn error_pages(&self) -> &HashMap<u16, String>;
     fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)>;
     fn locations(&self) -> Option<&HashMap<PathBuf, Location>>;
@@ -33,253 +36,272 @@ pub trait Config {
     fn internal(&self) -> bool;
     fn is_location(&self) -> bool;
 
-	/*------------------------------------------------------------*/
-	/*-------------------------[ Body ]---------------------------*/
-	/*------------------------------------------------------------*/
+    /*------------------------------------------------------------*/
+    /*-------------------------[ Body ]---------------------------*/
+    /*------------------------------------------------------------*/
 
-	async fn handle_body_request(&self, request: &Request, stream: &mut TcpStream, raw_left: &str) -> Result<String, ResponseCode> {
+    async fn handle_body_request(
+        &self,
+        request: &Request,
+        stream: &mut TcpStream,
+        raw_left: &str,
+    ) -> Result<String, ResponseCode> {
+        match request.method() {
+            &Method::OPTIONS => self.upload_body(request, stream, raw_left).await,
+            _ => Self::consume_body(request, stream, raw_left).await,
+        }
+    }
 
-		match request.method() {
-			&Method::OPTIONS => self.upload_body(request, stream, raw_left).await,
-			_ => Self::consume_body(request, stream, raw_left).await,
-		}
-	}
+    async fn upload_body(
+        &self,
+        request: &Request,
+        stream: &mut TcpStream,
+        raw_left: &str,
+    ) -> Result<String, ResponseCode> {
+        todo!()
+    }
 
-	async fn upload_body(&self, request: &Request, stream: &mut TcpStream, raw_left: &str) -> Result<String, ResponseCode> {
-		todo!()
-	}
+    async fn consume_body(
+        request: &Request,
+        stream: &mut TcpStream,
+        raw_left: &str,
+    ) -> Result<String, ResponseCode> {
+        if request.content_length().is_none() {
+            return Ok(raw_left.to_string());
+        }
 
-	async fn consume_body(request: &Request, stream: &mut TcpStream, raw_left: &str) -> Result<String, ResponseCode> {
+        let content_length = request.content_length().unwrap().clone() as usize;
 
-		if request.content_length().is_none() { return Ok(raw_left.to_string()) }
+        if raw_left.len() >= content_length {
+            return Ok(raw_left[content_length..].to_string());
+        }
 
-		let content_length = request.content_length().unwrap().clone() as usize;
+        let length_missing = content_length - raw_left.len();
 
-		if raw_left.len() >= content_length { return Ok(raw_left[content_length..].to_string()) }
+        match Self::consume_stream(stream, length_missing).await {
+            Ok(str) => Ok(str),
+            Err(err) => Err(ResponseCode::from_error(&err)),
+        }
+    }
 
-		let length_missing = content_length - raw_left.len();
+    async fn consume_stream(stream: &mut TcpStream, len: usize) -> io::Result<String> {
+        let mut buffer = [0; 65536];
+        let mut read = 0;
 
-		match Self::consume_stream(stream, length_missing).await {
-			Ok(str) => Ok(str),
-			Err(err) => Err(ResponseCode::from_error(&err)),
-		}
-	}
-	
-	async fn consume_stream(stream: &mut TcpStream, len: usize) -> io::Result<String> {
-		let mut buffer = [0; 65536];
-		let mut read = 0;
+        while read < len - 65536 {
+            match stream.read(&mut buffer).await {
+                Ok(n) => read += n,
+                Err(err) => return Err(err),
+            }
+        }
 
-		while read < len - 65536 {
-			match stream.read(&mut buffer).await {
-				Ok(n) => read += n,
-				Err(err) => return Err(err),
-			}
-		}
+        let mut buffer = String::new();
 
-		let mut buffer = String::new();
+        while read < len {
+            match stream.read_to_string(&mut buffer).await {
+                Ok(n) => read += n,
+                Err(err) => return Err(err),
+            }
+        }
 
-		while read < len {
-			match stream.read_to_string(&mut buffer).await {
-				Ok(n) => read += n,
-				Err(err) => return Err(err),
-			}
-		}
+        let end = read - len;
 
-		let end = read - len;
+        return Ok(buffer[end..].to_string());
+    }
 
-		return Ok(buffer[end..].to_string())
+    /*------------------------------------------------------------*/
+    /*-----------------------[ Response ]-------------------------*/
+    /*------------------------------------------------------------*/
 
-	}
+    async fn build_response(&self, request: &Request) -> Result<Response, Error> {
+        eprintln!("Building response...");
+        match request.method() {
+            &Method::GET => return self.build_get_response(request).await,
+            // &Method::POST => { return self.build_post_response(request).await },
+            _ => return Err(Error::new(ErrorKind::Other, "method not implemented")), // not implemented
+        }
+    }
 
-	/*------------------------------------------------------------*/
-	/*-----------------------[ Response ]-------------------------*/
-	/*------------------------------------------------------------*/
+    /*------------------------------------------------------------*/
+    /*-------------------------[ POST ]---------------------------*/
+    /*------------------------------------------------------------*/
 
-	async fn build_response(&self, request: &Request) -> Result<Response, Error> {
-		eprintln!("Building response...");
-		match request.method() {
-			&Method::GET => { return self.build_get_response(request).await },
-			// &Method::POST => { return self.build_post_response(request).await },
-			_ => return Err(Error::new(ErrorKind::Other, "method not implemented")), // not implemented
-		}
-	}
+    // async fn build_post_response(&self, request: &Request) -> Result<Response, Error> {
+    // 	// eprintln!("Building POST response for '{}'...", request.path().display());
 
-	/*------------------------------------------------------------*/
-	/*-------------------------[ POST ]---------------------------*/
-	/*------------------------------------------------------------*/
+    // 	// TODO!: upload body
 
-	// async fn build_post_response(&self, request: &Request) -> Result<Response, Error> {
-	// 	// eprintln!("Building POST response for '{}'...", request.path().display());
+    // 	let mut response = Response::new(ResponseCode::from_code(204));	// no content
 
-	// 	// TODO!: upload body
+    // 	eprintln!("POST response build...");
 
-	// 	let mut response = Response::new(ResponseCode::from_code(204));	// no content
-	
-	// 	eprintln!("POST response build...");
-	
-	// 	Ok(response)
+    // 	Ok(response)
 
-	// }
+    // }
 
-	// async fn upload_body(&self, request: &Request) -> io::Result<()> {
+    // async fn upload_body(&self, request: &Request) -> io::Result<()> {
 
-	// 	if self.upload_folder().is_none() { return Err(io::Error::new(ErrorKind::NotFound, "No upload folder")) }
-	// 	let upload_folder = self.upload_folder().unwrap();
-		
-	// 	if upload_folder.is_dir() == false { return Err(io::Error::new(ErrorKind::NotFound, "Invalid upload folder")) }
+    // 	if self.upload_folder().is_none() { return Err(io::Error::new(ErrorKind::NotFound, "No upload folder")) }
+    // 	let upload_folder = self.upload_folder().unwrap();
 
-	// 	if request.get("Content-Type").is_none() {  } 
+    // 	if upload_folder.is_dir() == false { return Err(io::Error::new(ErrorKind::NotFound, "Invalid upload folder")) }
 
-	// 	Ok(())
-	// }
+    // 	if request.get("Content-Type").is_none() {  }
 
-	/*------------------------------------------------------------*/
-	/*-------------------------[ GET ]----------------------------*/
-	/*------------------------------------------------------------*/
+    // 	Ok(())
+    // }
 
-	async fn build_get_response(&self, request: &Request) -> Result<Response, Error> {
-		eprintln!("Building GET response for '{}'...", request.path().display());
-		// todo! list files if no auto_index
-		// todo! handle GET on cgi
+    /*------------------------------------------------------------*/
+    /*-------------------------[ GET ]----------------------------*/
+    /*------------------------------------------------------------*/
 
-		let file = self.get_GET_request_file(request).await?;
+    async fn build_get_response(&self, request: &Request) -> Result<Response, Error> {
+        eprintln!(
+            "Building GET response for '{}'...",
+            request.path().display()
+        );
+        // todo! list files if no auto_index
+        // todo! handle GET on cgi
 
-		eprintln!("GET response build...");
-		let mut response = Response::
-			new(ResponseCode::default())
-			.file(file);
+        let file = self.get_GET_request_file(request).await?;
 
-		response.add_header("Content-Type".to_owned(), "text/html".to_owned());
+        eprintln!("GET response build...");
+        let mut response = Response::new(ResponseCode::default()).file(file);
 
-		Ok(response)
+        response.add_header("Content-Type".to_owned(), "text/html".to_owned());
 
-	}
+        Ok(response)
+    }
 
-	#[allow(non_snake_case)]
-	async fn get_GET_request_file(&self, request: &Request) -> io::Result<File> {
+    #[allow(non_snake_case)]
+    async fn get_GET_request_file(&self, request: &Request) -> io::Result<File> {
+        eprintln!("trying to open '{}'...", request.path().display());
+        if request.path().is_file() {
+            match File::open(request.path()).await {
+                Ok(file) => Ok(file),
+                Err(err) => Err(err),
+            }
+        } else if request.path().is_dir() {
+            // TODO!: List directory
+            todo!("List directory");
+        } else {
+            Err(Error::new(ErrorKind::NotFound, "file not found"))
+        }
+    }
 
-		eprintln!("trying to open '{}'...", request.path().display());
-		if request.path().is_file() {
-			match File::open(request.path()).await {
-				Ok(file) => Ok(file),
-				Err(err) => Err(err),
-			}
-		} else if request.path().is_dir() {
-			// TODO!: List directory
-			todo!("List directory");
-		} else {
-			Err(Error::new(ErrorKind::NotFound, "file not found"))
-		}
-	}
+    /*------------------------------------------------------------*/
+    /*-----------------------[ Parsing ]--------------------------*/
+    /*------------------------------------------------------------*/
 
-	/*------------------------------------------------------------*/
-	/*-----------------------[ Parsing ]--------------------------*/
-	/*------------------------------------------------------------*/
+    fn parse_request(&self, request: &mut Request) -> Result<(), ResponseCode> {
+        if let Some(location) = self.get_request_location(request) {
+            eprintln!("Location...");
+            return location.parse_request(request);
+        }
+        eprintln!("Parsing request...");
 
-	fn parse_request(&self, request: &mut Request) -> Result<(), ResponseCode> {
-		if let Some(location) = self.get_request_location(request) {
-			eprintln!("Location...");
-			return location.parse_request(request);
-		}
-		eprintln!("Parsing request...");
-		
-		self.parse_method(request)?;
+        self.parse_method(request)?;
 
-		if request.content_length()  > self.max_body_size() {
-			return Err(ResponseCode::from_code(413));
-		}
+        if request.content_length() > self.max_body_size() {
+            return Err(ResponseCode::from_code(413));
+        }
 
-		self.format_path(request)?;
+        self.format_path(request)?;
 
-		Ok(())
-	}
+        Ok(())
+    }
 
-	fn format_path(&self, request: &mut Request) -> Result<(), ResponseCode> {
+    fn format_path(&self, request: &mut Request) -> Result<(), ResponseCode> {
+        self.add_root_or_alias(request)?;
+        self.add_index_if_needed(request)?;
+        // let new_path =
+        Ok(())
+    }
 
-		self.add_root_or_alias(request)?;
-		self.add_index_if_needed(request)?;
-		// let new_path = 
-		Ok(())
-	}
+    fn add_index_if_needed(&self, request: &mut Request) -> Result<(), ResponseCode> {
+        if request.path().is_dir() == false {
+            return Ok(());
+        } // not a dir -> no index needed
 
-	fn add_index_if_needed(&self, request: &mut Request) -> Result<(), ResponseCode> {
+        if self.auto_index() == true {
+            if self.index().is_some() {
+                let path = request.path().to_str().unwrap();
+                let path = format!("{}/{}", path, self.index().unwrap(),);
 
-		if request.path().is_dir() == false { return Ok(()) }	// not a dir -> no index needed
+                let path = PathBuf::from(path);
+                request.set_path(path);
+            } else {
+                // auto index on but no index
+                return Err(ResponseCode::from_code(404));
+            }
+        }
 
-		if self.auto_index() == true {
-			if self.index().is_some() {
-				let path = request.path().to_str().unwrap();
-				let path = format!(
-					"{}/{}",
-					path,
-					self.index().unwrap(),
-				);
+        // TODO!: later in the code, when building response, check if directory, and list the directory if it's one
 
-				let path = PathBuf::from(path);
-				request.set_path(path);
+        Ok(())
+    }
 
-			} else {	// auto index on but no index
-				return Err(ResponseCode::from_code(404));
-			}
-		}
+    fn add_root_or_alias(&self, request: &mut Request) -> Result<(), ResponseCode> {
+        let path = if self.root().is_some() {
+            let mut path = self.root().unwrap().clone();
+            path = PathBuf::from(format!(
+                "{}/{}",
+                path.to_str().unwrap(),
+                request.path().to_str().unwrap(),
+            ));
 
-		// TODO!: later in the code, when building response, check if directory, and list the directory if it's one
+            path
+        } else if self.alias().is_some() {
+            let path = request.path().to_str().unwrap().to_string();
+            let path = path.replacen(
+                self.path().to_str().unwrap(),
+                self.alias().unwrap().to_str().unwrap(),
+                1,
+            );
+            eprintln!(
+                "[\n\tAlias: {} -> {}\n\tpath: {}\n\t result: {}\n]",
+                self.path().display(),
+                self.alias().unwrap().display(),
+                request.path().display(),
+                path,
+            );
 
-		Ok(())
-	}
+            PathBuf::from(path)
+        } else {
+            return Err(ResponseCode::from_code(404));
+        }; // no root nor alias
 
-	fn add_root_or_alias(&self, request: &mut Request) -> Result<(), ResponseCode> {
-		let path = if self.root().is_some() {
-			let mut path = self.root().unwrap().clone();
-			path = PathBuf::from(format!(
-				"{}/{}", path.to_str().unwrap(),
-				request.path().to_str().unwrap(),
-			));
+        request.set_path(path);
+        Ok(())
+    }
 
-			path
-		} else if self.alias().is_some() {
-			let path = request.path().to_str().unwrap().to_string();
-			let path = path.replacen(self.path().to_str().unwrap(), self.alias().unwrap().to_str().unwrap(), 1);
-			eprintln!(
-				"[\n\tAlias: {} -> {}\n\tpath: {}\n\t result: {}\n]",
-				self.path().display(),
-				self.alias().unwrap().display(),
-				request.path().display(),
-				path,
-			);
-			
-			PathBuf::from(path)
-		} else { return Err(ResponseCode::from_code(404)) };	// no root nor alias
+    fn is_cgi(&self, request: &Request) -> bool {
+        let request_extension = request.path().extension();
 
-		request.set_path(path);
-		Ok(())
-	}
+        if request_extension.is_none() {
+            return false;
+        }
 
-	fn is_cgi(&self, request: &Request) -> bool {
-		let request_extension = request.path().extension();
+        let request_extension = match request_extension.unwrap().to_str() {
+            Some(extension) => extension,
+            None => return false,
+        };
 
-		if request_extension.is_none() { return false }
-
-		let request_extension = match request_extension.unwrap().to_str() {
-			Some(extension)	=> extension,
-			None 					=> return false,
-		};
-
-		if self.cgi().contains_key(request_extension) {
-			true
-		} else {
-			false
-		}
-	}
+        if self.cgi().contains_key(request_extension) {
+            true
+        } else {
+            false
+        }
+    }
 
     fn parse_method(&self, request: &Request) -> Result<(), ResponseCode> {
         let methods = self.methods();
-		if methods.is_none() {
-			eprintln!("NO METHODS ALLOWED !");
+        if methods.is_none() {
+            eprintln!("NO METHODS ALLOWED !");
             return Err(ResponseCode::from_code(405));
         } // No method allowed
         if !methods.as_ref().unwrap().contains(request.method()) {
-			eprintln!("METHOD NOT ALLOWED !");
+            eprintln!("METHOD NOT ALLOWED !");
             return Err(ResponseCode::from_code(405));
         } // Ok
 
@@ -287,43 +309,52 @@ pub trait Config {
             // check if implemented (wip)
             &Method::UNKNOWN => Err(ResponseCode::from_code(501)), // Not allowed
             _ => Ok(()),
-
         };
     }
 
-	fn get_request_location(&self, request: &Request) -> Option<&Location> {
-		if self.is_location() == true { return None }
-		if self.locations().is_none() { return None }
+    fn get_request_location(&self, request: &Request) -> Option<&Location> {
+        if self.is_location() == true {
+            return None;
+        }
+        if self.locations().is_none() {
+            return None;
+        }
 
-		let locations = self.locations().unwrap();
-		let mut save: Option<&Location> = None;
-		let mut save_path = None;
+        let locations = self.locations().unwrap();
+        let mut save: Option<&Location> = None;
+        let mut save_path = None;
 
-		for (location_path, location) in locations {
-			let location_path = match location_path.to_str() {
-				Some(location_path) => location_path, None => continue
-			};
-			
-			let request_path = match request.path().to_str() {
-				Some(path) => path, None => continue
-			};
+        for (location_path, location) in locations {
+            let location_path = match location_path.to_str() {
+                Some(location_path) => location_path,
+                None => continue,
+            };
 
-			if request_path.starts_with(location_path) {
-				match location.exact_path() {
-					true => {
-						if save.is_none() && location_path == request_path { save = Some(location); save_path = Some(location_path) }
-					}
-					false => {
-						if save.is_none() { save = Some(location); save_path = Some(location_path) }
-						else if location_path > save_path.unwrap() { save = Some(location) }
-					}
+            let request_path = match request.path().to_str() {
+                Some(path) => path,
+                None => continue,
+            };
 
-				}
-			}
-		}
+            if request_path.starts_with(location_path) {
+                match location.exact_path() {
+                    true => {
+                        if save.is_none() && location_path == request_path {
+                            save = Some(location);
+                            save_path = Some(location_path)
+                        }
+                    }
+                    false => {
+                        if save.is_none() {
+                            save = Some(location);
+                            save_path = Some(location_path)
+                        } else if location_path > save_path.unwrap() {
+                            save = Some(location)
+                        }
+                    }
+                }
+            }
+        }
 
-		save
-	}
-
-
+        save
+    }
 }

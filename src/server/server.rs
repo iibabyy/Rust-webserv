@@ -10,24 +10,15 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    path::PathBuf,
-};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 
-
-use crate::{
-    request::Method, LocationBlock, ServerBlock
-};
+use crate::{request::Method, LocationBlock, ServerBlock};
 
 use super::{config::Config, location::Location, parsing};
-
 
 /*---------------------------------------------------------------*/
 /*-------------------------[ SERVER ]----------------------------*/
 /*---------------------------------------------------------------*/
-
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -53,25 +44,58 @@ pub struct Server {
 }
 
 impl Config for Server {
-    fn path(&self) -> &PathBuf/*----------------------------------*/{ &self.path }
-	fn internal(&self) -> bool/*----------------------------------*/{ self.internal }
-    fn auto_index(&self) -> bool/*--------------------------------*/{ self.auto_index }
-    fn is_location(&self) -> bool/*-------------------------------*/{ false }
-    fn port(&self) -> Option<&u16>/*------------------------------*/{ self.port.as_ref() }
-    fn index(&self) -> Option<&String>/*--------------------------*/{ self.index.as_ref() }
-    fn root(&self) -> Option<&PathBuf>/*--------------------------*/{ self.root.as_ref() }
-	fn alias(&self) -> Option<&PathBuf>/*-------------------------*/{ None }
-    fn name(&self) -> Option<&Vec<String>>/*----------------------*/{ self.name.as_ref() }
-    fn max_body_size(&self) -> Option<&u64>/*---------------------*/{ self.max_body_size.as_ref() }
-    fn methods(&self) -> Option<&Vec<Method>>/*-------------------*/{ self.methods.as_ref() }
-    fn cgi(&self) -> &HashMap<String, PathBuf>/*------------------*/{ &self.cgi }
-    fn upload_folder(&self) -> Option<&PathBuf>/*-----------------*/{ self.upload_folder.as_ref() }
-    fn error_pages(&self) -> &HashMap<u16, String>/*--------------*/{ &self.error_pages }
-    fn return_(&self) -> Option<&(u16, Option<String>)>/*---------*/{ self.return_.as_ref() }
-    fn locations(&self) -> Option<&HashMap<PathBuf, Location>>/*--*/{ Some(&self.locations) }
-    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)>{ &self.error_redirect }
+    fn path(&self) -> &PathBuf /*----------------------------------*/ {
+        &self.path
+    }
+    fn internal(&self) -> bool /*----------------------------------*/ {
+        self.internal
+    }
+    fn auto_index(&self) -> bool /*--------------------------------*/ {
+        self.auto_index
+    }
+    fn is_location(&self) -> bool /*-------------------------------*/ {
+        false
+    }
+    fn port(&self) -> Option<&u16> /*------------------------------*/ {
+        self.port.as_ref()
+    }
+    fn index(&self) -> Option<&String> /*--------------------------*/ {
+        self.index.as_ref()
+    }
+    fn root(&self) -> Option<&PathBuf> /*--------------------------*/ {
+        self.root.as_ref()
+    }
+    fn alias(&self) -> Option<&PathBuf> /*-------------------------*/ {
+        None
+    }
+    fn name(&self) -> Option<&Vec<String>> /*----------------------*/ {
+        self.name.as_ref()
+    }
+    fn max_body_size(&self) -> Option<&u64> /*---------------------*/ {
+        self.max_body_size.as_ref()
+    }
+    fn methods(&self) -> Option<&Vec<Method>> /*-------------------*/ {
+        self.methods.as_ref()
+    }
+    fn cgi(&self) -> &HashMap<String, PathBuf> /*------------------*/ {
+        &self.cgi
+    }
+    fn upload_folder(&self) -> Option<&PathBuf> /*-----------------*/ {
+        self.upload_folder.as_ref()
+    }
+    fn error_pages(&self) -> &HashMap<u16, String> /*--------------*/ {
+        &self.error_pages
+    }
+    fn return_(&self) -> Option<&(u16, Option<String>)> /*---------*/ {
+        self.return_.as_ref()
+    }
+    fn locations(&self) -> Option<&HashMap<PathBuf, Location>> /*--*/ {
+        Some(&self.locations)
+    }
+    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)> {
+        &self.error_redirect
+    }
 }
-
 
 /*---------------------------------------------------------------*/
 /*--------------------------[ UTILS ]----------------------------*/
@@ -84,7 +108,7 @@ impl Server {
             port: None,
             socket: None,
             root: None,
-			upload_folder: None,
+            upload_folder: None,
             path: PathBuf::from("/"),
             max_body_size: None,
             index: None,
@@ -137,13 +161,11 @@ impl Server {
     // }
 }
 
-
 /*---------------------------------------------------------------*/
 /*----------------------[ CONFIG PARSING ]-----------------------*/
 /*---------------------------------------------------------------*/
 
 impl Server {
-
     pub fn init_servers(configs: Vec<ServerBlock>) -> Result<Vec<Self>, String> {
         let mut servers = Vec::new();
 
@@ -157,17 +179,17 @@ impl Server {
     fn add_directive(&mut self, name: String, infos: Vec<String>) -> Result<(), String> {
         match name.as_str() {
             "root" => {
-                if self.root.is_some() { println!("Warning: root: duplicated value") };
-				self.root = Some(parsing::extract_root(infos)?)
+                if self.root.is_some() {
+                    println!("Warning: root: duplicated value")
+                };
+                self.root = Some(parsing::extract_root(infos)?)
             }
             "alias" => {
-				return Err(format!(
-					"invalid field: alias: alias can only be set in locations"
-				));
+                return Err(format!(
+                    "invalid field: alias: alias can only be set in locations"
+                ));
             }
-			"upload_folder" => {
-				self.upload_folder = Some(parsing::extract_upload_folder(infos)?)
-            }
+            "upload_folder" => self.upload_folder = Some(parsing::extract_upload_folder(infos)?),
             "listen" => {
                 (self.port, self.default) = parsing::extract_listen(infos)?;
             }
@@ -213,13 +235,12 @@ impl Server {
                 if self.methods.is_none() {
                     self.methods = Some(Vec::new())
                 }
-				
-				let mut method = methods
-					.iter()
-					.map(|method| method.as_ref().unwrap().to_owned())
-					.collect::<Vec<Method>>();
-				self.methods.as_mut().unwrap().append(&mut method);
 
+                let mut method = methods
+                    .iter()
+                    .map(|method| method.as_ref().unwrap().to_owned())
+                    .collect::<Vec<Method>>();
+                self.methods.as_mut().unwrap().append(&mut method);
             }
             "return" => {
                 self.return_ = Some(parsing::extract_return(infos)?);
