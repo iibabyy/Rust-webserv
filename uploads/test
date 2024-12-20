@@ -1,58 +1,9 @@
-/* ************************************************************************** */
-/*																			*/
-/*														:::	  ::::::::   */
-/*   main.cpp										   :+:	  :+:	:+:   */
-/*													+:+ +:+		 +:+	 */
-/*   By: madamou <madamou@student.42.fr>			+#+  +:+	   +#+		*/
-/*												+#+#+#+#+#+   +#+		   */
-/*   Created: 2024/11/05 00:05:09 by madamou		   #+#	#+#			 */
-/*   Updated: 2024/12/11 00:28:14 by madamou		  ###   ########.fr	   */
-/*																			*/
-/* ************************************************************************** */
+------WebKitFormBoundaryQphxzMl4yvYqU3y3
+Content-Disposition: form-data; name="fileUpload[]"; filename="infinite.py"
+Content-Type: application/octet-stream
 
-#include "../includes/includes.hpp"
-#include "class/GlobalData/GlobalData.hpp"
-#include "class/Server/Server.hpp"
-#include "class/Parser/Parser.hpp"
-#include <exception>
-#include <iostream>
-#include <stdexcept>
-#include <vector>
-#include <csignal>
+#!/usr/bin/python3
 
-void ifSignal(int sig) {
-	(void)sig;
-	g_running = false;
-}
-
-void signalHandle(void) {
-	signal(SIGINT, ifSignal);
-	signal(SIGQUIT, ifSignal);
-	signal(SIGTSTP, ifSignal);
-}
-
-int main(int argc, char **argv, char **env) {
-	GlobalData data;
-	std::vector<Server> servVec;
-	
-	signalHandle();
-	if (argc != 2) {
-		std::cerr << "Need only one argument" << std::endl;
-		return 1;
-	}
-	try {
-		servVec = Pars::parse(argv[1], env);
-	} catch (std::exception &e) {
-		std::cerr << "Error : " << e.what() << std::endl;
-		return 1;
-	}
-	try { 
-		data.runServers(servVec);
-	}
-	catch(std::exception& e) {
-		std::cerr << "Error: " << e.what() << std::endl;
-		return 1;
-	}
-	data.closeServers();
-	return 0;
-}
+while (1):
+	pass
+------WebKitFormBoundaryQphxzMl4yvYqU3y3--

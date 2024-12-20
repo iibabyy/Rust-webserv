@@ -242,20 +242,19 @@ impl Request {
             Err(_) => Method::UNKNOWN,
         };
 
-		
         self.path = PathBuf::from(split[1]);
         self.http_version = split[2].to_owned();
         Ok(())
     }
 
-	fn add_path(&mut self, path: &str) {
-		if let Some(query_pos) = path.find("?") {
-			self.query = Some(path[query_pos + 1..].to_string());
-			self.path = PathBuf::from(&path[..query_pos]);
-		} else {
-			self.path = PathBuf::from(path)
-		}
-	}
+    fn add_path(&mut self, path: &str) {
+        if let Some(query_pos) = path.find("?") {
+            self.query = Some(path[query_pos + 1..].to_string());
+            self.path = PathBuf::from(&path[..query_pos]);
+        } else {
+            self.path = PathBuf::from(path)
+        }
+    }
 
     pub fn get(&self, header: &str) -> Option<&String> {
         match self.headers.get(header) {
@@ -303,14 +302,14 @@ impl Request {
     pub fn content_type(&self) -> Option<&String> {
         self.content_type.as_ref()
     }
-	
-	pub fn headers(&self) -> &HashMap<String, String> {
-		&self.headers
-	}
-	
-	pub fn query(&self) -> Option<&String> {
-			self.query.as_ref()
-		}
+
+    pub fn headers(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
+    pub fn query(&self) -> Option<&String> {
+        self.query.as_ref()
+    }
 }
 
 /*------------------------------------------------------------------------------------*/
@@ -389,8 +388,8 @@ impl Method {
         }
     }
 
-	pub fn to_string(&self) -> String {
-		match self {
+    pub fn to_string(&self) -> String {
+        match self {
             Method::GET => "GET".to_owned(),
             Method::POST => "POST".to_owned(),
             Method::DELETE => "DELETE".to_owned(),
@@ -402,7 +401,7 @@ impl Method {
             Method::OPTIONS => "OPTIONS".to_owned(),
             Method::UNDEFINED | Method::UNKNOWN => "UNKNOWN".to_owned(),
         }
-	}
+    }
 }
 
 /*------------------------------------------------------------------------------------*/
