@@ -14,7 +14,8 @@ use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 
 use crate::{request::Method, LocationBlock, ServerBlock};
 
-use super::{config::Config, handler::Handler, location::Location, parsing};
+use super::{location::Location, parsing, traits::{config::Config, handler::Handler}};
+
 
 /*---------------------------------------------------------------*/
 /*-------------------------[ SERVER ]----------------------------*/

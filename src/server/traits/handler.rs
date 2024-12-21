@@ -16,10 +16,10 @@ use crate::{
     listener::send_error_response,
     request::{Method, Request},
     response::response::{Response, ResponseCode},
-    server::config::utils,
 };
 
-use super::{config::Config, server::Server};
+use super::config::{utils, Config};
+
 
 pub trait Handler: Config {
     async fn handle_request(

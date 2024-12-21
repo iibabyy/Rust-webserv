@@ -4,11 +4,10 @@
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use super::{config::Config, handler::Handler, parsing};
 
 use crate::{request::Method, LocationBlock};
 
-use super::server::Server;
+use super::{parsing, server::Server, traits::{config::Config, handler::Handler}};
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]

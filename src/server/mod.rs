@@ -1,7 +1,5 @@
-use config::Config;
 
-pub mod config;
-pub mod handler;
+pub mod traits;
 pub mod location;
 pub mod server;
 

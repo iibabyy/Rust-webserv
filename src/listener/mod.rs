@@ -1,11 +1,7 @@
 use std::{
-    collections::HashMap,
-    io::{self, Error, ErrorKind},
-    net::IpAddr,
-    process::Output,
+    collections::HashMap, io, net::IpAddr
 };
 
-use nom::AsBytes;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -15,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     request::Request,
     response::response::{Response, ResponseCode},
-    server::{config::Config, handler::Handler, location::Location, server::Server},
+    server::{server::Server, traits::{config::Config, handler::Handler}},
 };
 
 pub struct Listener {

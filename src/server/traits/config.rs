@@ -1,26 +1,16 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
-    io::{self, ErrorKind},
     path::PathBuf,
-    process::{Output, Stdio},
 };
 
-use tokio::{
-    fs::{File, OpenOptions},
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-    process::Command,
-};
-use utils::UploadType;
 
 use crate::{
     request::{Method, Request},
-    response::response::{Response, ResponseCode},
+    response::response::ResponseCode,
     server::location::Location,
 };
 
-use super::{location, server::Server};
 
 #[allow(dead_code)]
 pub trait Config {
@@ -355,7 +345,6 @@ pub mod utils {
         let mut files = vec![];
 
         let mut entries = fs::read_dir(dir).await?;
-        let dir_str = dir.to_string_lossy().to_string();
 
         while let Some(entry) = entries.next_entry().await? {
             let filename = entry.file_name();
