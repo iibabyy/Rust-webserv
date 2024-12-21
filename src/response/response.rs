@@ -2,6 +2,7 @@ use core::str;
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind},
+    path::PathBuf,
     usize,
 };
 
@@ -111,9 +112,18 @@ impl Response {
 
     pub fn new(code: ResponseCode) -> Response {
         let msg = code.to_string().clone();
+        let mut headers = HashMap::new();
+
+        if let Some(redirect) = &code.redirect {
+            headers.insert(
+                "Location".to_string(),
+                redirect.to_string_lossy().to_string(),
+            );
+        }
+
         Response {
             code,
-            headers: HashMap::new(),
+            headers,
             file: None,
             content: msg,
         }
@@ -142,6 +152,7 @@ impl Response {
 #[derive(Clone, Debug)]
 pub struct ResponseCode {
     code: u16,
+    redirect: Option<PathBuf>,
     msg: String,
 }
 
@@ -149,6 +160,7 @@ impl Default for ResponseCode {
     fn default() -> Self {
         ResponseCode {
             code: 200,
+            redirect: None,
             msg: "OK".to_owned(),
         }
     }
@@ -159,6 +171,15 @@ impl ResponseCode {
     pub fn new(code: u16, msg: &str) -> ResponseCode {
         ResponseCode {
             code,
+            redirect: None,
+            msg: msg.to_string(),
+        }
+    }
+
+    pub fn new_redirect(code: u16, msg: &str, redirect: PathBuf) -> ResponseCode {
+        ResponseCode {
+            code,
+            redirect: Some(redirect),
             msg: msg.to_string(),
         }
     }
@@ -169,7 +190,11 @@ impl ResponseCode {
             None => "".to_owned(),
         };
 
-        ResponseCode { code, msg }
+        ResponseCode {
+            code,
+            msg,
+            redirect: None,
+        }
     }
 
     pub fn from_error(err: &io::Error) -> ResponseCode {
@@ -184,6 +209,7 @@ impl ResponseCode {
                 _ => 500,                            // Default to Internal Server Error
             },
             msg: err.to_string(),
+            redirect: None,
         }
     }
 
@@ -208,6 +234,15 @@ impl ResponseCode {
 
     pub fn msg(&self) -> &str {
         &self.msg
+    }
+
+    pub fn set_redirect(&mut self, redirect: PathBuf) -> &mut Self {
+        self.redirect = Some(redirect);
+        self
+    }
+
+    pub fn redirect(&self) -> Option<&PathBuf> {
+        self.redirect.as_ref()
     }
 }
 

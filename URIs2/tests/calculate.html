@@ -1,161 +1,161 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Calculatrice</title>
-	<style>
-		body {
-			font-family: Arial, sans-serif;
-			text-align: center;
-			background: linear-gradient(to bottom right, #8ec5fc, #e0c3fc);
-			color: #333;
-			padding: 20px;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			min-height: 100vh;
-		}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculatrice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(to bottom right, #8ec5fc, #e0c3fc);
+            color: #333;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-		.container {
-			background-color: rgba(255, 255, 255, 0.9);
-			padding: 30px;
-			border-radius: 15px;
-			box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-			width: 100%;
-			max-width: 400px;
-		}
+        .container {
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+        }
 
-		h1 {
-			font-size: 2.5em;
-			color: #4a90e2;
-			margin-bottom: 20px;
-		}
+        h1 {
+            font-size: 2.5em;
+            color: #4a90e2;
+            margin-bottom: 20px;
+        }
 
-		form {
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-		}
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-		label {
-			font-size: 1.2em;
-			color: #555;
-			margin-bottom: 5px;
-		}
+        label {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 5px;
+        }
 
-		input[type="number"] {
-			padding: 10px;
-			font-size: 1em;
-			margin-bottom: 15px;
-			width: 100%;
-			border: 1px solid #ccc;
-			border-radius: 5px;
-			background-color: #f9f9f9;
-		}
+        input[type="number"] {
+            padding: 10px;
+            font-size: 1em;
+            margin-bottom: 15px;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
 
-		button {
-			padding: 10px 20px;
-			font-size: 1.2em;
-			color: white;
-			background-color: #4a90e2;
-			border: none;
-			border-radius: 5px;
-			cursor: pointer;
-			transition: background-color 0.3s ease, transform 0.2s ease;
-			width: 100%;
-			max-width: 200px;
-		}
+        button {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            color: white;
+            background-color: #4a90e2;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            width: 100%;
+            max-width: 200px;
+        }
 
-		button:hover {
-			background-color: #357abd;
-			transform: scale(1.05);
-		}
+        button:hover {
+            background-color: #357abd;
+            transform: scale(1.05);
+        }
 
-		button:active {
-			transform: scale(0.95);
-		}
+        button:active {
+            transform: scale(0.95);
+        }
 
-		#goBackButton {
-			margin-top: 20px;
-			background-color: #6c757d;
-		}
+        #goBackButton {
+            margin-top: 20px;
+            background-color: #6c757d;
+        }
 
-		#goBackButton:hover {
-			background-color: #5a6268;
-		}
+        #goBackButton:hover {
+            background-color: #5a6268;
+        }
 
-		#result {
-			font-size: 1.5em;
-			color: #4a90e2;
-			margin-top: 20px;
-			background-color: #f9f9f9;
-			padding: 15px;
-			border-radius: 10px;
-			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-			width: 100%;
-			max-width: 300px;
-			margin-left: auto;
-			margin-right: auto;
-			word-wrap: break-word;
-		}
-	</style>
+        #result {
+            font-size: 1.5em;
+            color: #4a90e2;
+            margin-top: 20px;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+            word-wrap: break-word;
+        }
+    </style>
 </head>
 <body>
-	<div class="container">
-		<h1>Calculatrice</h1>
+    <div class="container">
+        <h1>Calculatrice</h1>
 
-		<form id="calcForm" action="calculate.php" method="post">
-			<label for="number1">Nombre 1:</label>
-			<input type="number" id="number1" name="number1" required>
+        <form id="calcForm" action="calculate.php" method="post">
+            <label for="number1">Nombre 1:</label>
+            <input type="number" id="number1" name="number1" required>
 
-			<label for="number2">Nombre 2:</label>
-			<input type="number" id="number2" name="number2" required>
+            <label for="number2">Nombre 2:</label>
+            <input type="number" id="number2" name="number2" required>
 
-			<button type="submit">Calculer</button>
-		</form>
+            <button type="submit">Calculer</button>
+        </form>
 
-		<h2>Résultat:</h2>
-		<pre id="result">Pas de calcul effectué</pre>
+        <h2>Résultat:</h2>
+        <pre id="result">Pas de calcul effectué</pre>
 
-		<button id="goBackButton" onclick="history.back()">Retour</button>
-	</div>
+        <button id="goBackButton" onclick="history.back()">Retour</button>
+    </div>
 
-	<script>
-		const form = document.getElementById('calcForm');
-		const result = document.getElementById('result');
+    <script>
+        const form = document.getElementById('calcForm');
+        const result = document.getElementById('result');
 
-		form.addEventListener('submit', async (event) => {
-			event.preventDefault(); // Empêche le rechargement de la page
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Empêche le rechargement de la page
 
-			// Récupère les données du formulaire
-			const formData = new FormData(form);
-			const params = new URLSearchParams();
+            // Récupère les données du formulaire
+            const formData = new FormData(form);
+            const params = new URLSearchParams();
 
-			// Encode les données en format "key=value"
-			for (const [key, value] of formData.entries()) {
-				params.append(key, value);
-			}
+            // Encode les données en format "key=value"
+            for (const [key, value] of formData.entries()) {
+                params.append(key, value);
+            }
 
-			try {
-				const response = await fetch(form.action, {
-					method: form.method,
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded',
-					},
-					body: params.toString() // Format URL-encoded
-				});
+            try {
+                const response = await fetch(form.action, {
+                    method: form.method,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params.toString() // Format URL-encoded
+                });
 
-				if (!response.ok) {
-					throw new Error(`Erreur serveur : ${response.status} ${response.statusText}`);
-				}
+                if (!response.ok) {
+                    throw new Error(`Erreur serveur : ${response.status} ${response.statusText}`);
+                }
 
-				const text = await response.text();
-				result.textContent = text;
-			} catch (error) {
-				result.textContent = 'Une erreur est survenue lors de la requête : ' + error.message;
-			}
-		});
-	</script>
+                const text = await response.text();
+                result.textContent = text;
+            } catch (error) {
+                result.textContent = 'Une erreur est survenue lors de la requête : ' + error.message;
+            }
+        });
+    </script>
 </body>
 </html>

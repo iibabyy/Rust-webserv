@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     io::{self, ErrorKind},
     path::PathBuf,
@@ -188,6 +189,10 @@ pub trait Config {
 
     async fn build_response(&self, request: &Request) -> Result<Response, io::Error> {
         eprintln!("Building response...");
+        if request.path().is_dir() {
+            return utils::build_auto_index(request.path()).await;
+        }
+
         match request.method() {
             &Method::GET => return self.build_get_response(request).await,
             &Method::POST => return self.build_get_response(request).await,
@@ -205,7 +210,6 @@ pub trait Config {
             request.path().display()
         );
         // todo! list files if no auto_index
-        // todo! handle GET on cgi
 
         let file = self.get_GET_request_file(request).await?;
 
@@ -226,7 +230,6 @@ pub trait Config {
                 Err(err) => Err(err),
             }
         } else if request.path().is_dir() {
-            // TODO!: List directory
             todo!("List directory");
         } else {
             Err(io::Error::new(ErrorKind::NotFound, "file not found"))
@@ -244,7 +247,10 @@ pub trait Config {
             return false;
         }
 
-        let extension = path.extension().unwrap().to_string_lossy().to_string();
+        let extension = match path.extension() {
+            Some(extension) => extension.to_string_lossy().to_string(),
+            None => return false,
+        };
 
         return self.cgi().contains_key(&extension);
     }
@@ -368,26 +374,38 @@ pub trait Config {
     }
 
     fn add_index_if_needed(&self, request: &mut Request) -> Result<(), ResponseCode> {
-        if request.path().is_dir() == false {
+        let path = request.path();
+        let path_str = request.path().to_string_lossy();
+
+        if path.is_file() == true {
             return Ok(());
-        } // not a dir -> no index needed
+        } else if path.is_dir() == true {
+            match self.format_dir_path(path_str) {
+                Ok(Some(path)) => request.set_path(path),
+                Ok(None) => (),
+                Err(response) => return Err(response),
+            };
 
-        if self.auto_index() == true {
-            if self.index().is_some() {
-                let path = request.path().to_str().unwrap();
-                let path = format!("{}/{}", path, self.index().unwrap(),);
+            return Ok(());
+        } else {
+            return Err(ResponseCode::from_code(404));
+        }
+    }
 
-                let path = PathBuf::from(path);
-                request.set_path(path);
-            } else {
-                // auto index on but no index
-                return Err(ResponseCode::from_code(404));
+    fn format_dir_path(&self, path_str: Cow<'_, str>) -> Result<Option<PathBuf>, ResponseCode> {
+        if self.index().is_some() {
+            let path = format!("{}/{}", path_str, self.index().unwrap(),);
+            let path = PathBuf::from(path);
+            if path.is_file() {
+                return Ok(Some(path));
             }
         }
 
-        // TODO!: later in the code, when building response, check if directory, and list the directory if it's one
+        if self.auto_index() == false {
+            return Err(ResponseCode::from_code(403));
+        }
 
-        Ok(())
+        Ok(None)
     }
 
     fn add_root_or_alias(&self, request: &mut Request) -> Result<(), ResponseCode> {
@@ -398,19 +416,12 @@ pub trait Config {
                 self.alias().unwrap().to_str().unwrap(),
                 1,
             );
-            eprintln!(
-                "[\n\tAlias: {} -> {}\n\tpath: {}\n\t result: {}\n]",
-                self.path().display(),
-                self.alias().unwrap().display(),
-                request.path().display(),
-                path,
-            );
 
             PathBuf::from(path)
         } else if self.root().is_some() {
             let mut path = self.root().unwrap().clone();
             path = PathBuf::from(format!(
-                "{}/{}",
+                "{}{}",
                 path.to_str().unwrap(),
                 request.path().to_str().unwrap(),
             ));
@@ -420,6 +431,13 @@ pub trait Config {
             return Err(ResponseCode::from_code(404));
         }; // no root nor alias
 
+        if path.is_dir() && path.to_string_lossy().ends_with("/") == false {
+            let redirect = PathBuf::from(format!("{}/", request.path().to_string_lossy()));
+            eprintln!("redirected on {}", redirect.display());
+            let response = ResponseCode::new_redirect(301, "Moved Premanently", redirect);
+            return Err(response);
+        }
+
         request.set_path(path);
         Ok(())
     }
@@ -427,7 +445,7 @@ pub trait Config {
     fn parse_method(&self, request: &Request) -> Result<(), ResponseCode> {
         let methods = self.methods();
         if methods.is_none() {
-            eprintln!("NO METHODS ALLOWED !");
+            eprintln!("NO METHODS ALLOWED");
             return Err(ResponseCode::from_code(405));
         } // No method allowed
         if !methods.as_ref().unwrap().contains(request.method()) {
@@ -437,7 +455,7 @@ pub trait Config {
 
         return match request.method() {
             // check if implemented (wip)
-            &Method::UNKNOWN => Err(ResponseCode::from_code(501)), // Not allowed
+            &Method::UNKNOWN | &Method::UNDEFINED => Err(ResponseCode::from_code(501)), // Not allowed
             _ => Ok(()),
         };
     }
@@ -491,15 +509,173 @@ pub trait Config {
 
 #[allow(dead_code)]
 mod utils {
-    use std::io::{self, ErrorKind};
+    use std::{
+        io::{self, ErrorKind},
+        path::PathBuf,
+        usize,
+    };
 
     use tokio::{
+        fs,
         io::{AsyncReadExt, AsyncWriteExt},
         net::TcpStream,
         process::Child,
     };
 
-    use crate::request::Request;
+    use crate::{
+        request::Request,
+        response::response::{Response, ResponseCode},
+    };
+
+    pub async fn build_auto_index(dir: &PathBuf) -> io::Result<Response> {
+        eprintln!(
+            "building auto-index for {:?}",
+            dir.to_string_lossy().to_string()
+        );
+
+        let files_ref = html_files_ref_from(dir).await?;
+        let files_ref = format_file_ref(files_ref);
+
+        let mut html = String::new();
+
+        let dir_name = match dir.file_name() {
+            Some(name) => name.to_str().unwrap_or("directory"),
+            None => "directory",
+        };
+
+        html.push_str("<!DOCTYPE html>\r\n");
+        html.push_str("<html lang=\"en\">\r\n");
+        html.push_str("<head>\r\n");
+        html.push_str("    <meta charset=\"UTF-8\">\r\n");
+        html.push_str(
+            "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\r\n",
+        );
+        html.push_str(&format!("    <title>Index of {dir_name}</title>\r\n"));
+        html.push_str("    <style>\r\n");
+        html.push_str("        body {\r\n");
+        html.push_str("            font-family: Arial, sans-serif;\r\n");
+        html.push_str("            margin: 0;\r\n");
+        html.push_str("            padding: 0;\r\n");
+        html.push_str("            display: flex;\r\n");
+        html.push_str("            flex-direction: column;\r\n");
+        html.push_str("            align-items: center;\r\n");
+        html.push_str("            justify-content: center;\r\n");
+        html.push_str("            height: 100vh;\r\n");
+        html.push_str("            background: linear-gradient(135deg, #1e3c72, #2a5298, #f6d365, #fda085);\r\n");
+        html.push_str("            background-size: 300% 300%;\r\n");
+        html.push_str("            animation: gradientAnimation 15s ease infinite;\r\n");
+        html.push_str("            color: #fff;\r\n");
+        html.push_str("        }\r\n");
+        html.push_str("        h1 {\r\n");
+        html.push_str("            color: #fff;\r\n");
+        html.push_str("            font-size: 24px;\r\n");
+        html.push_str("            margin-top: 20px;\r\n");
+        html.push_str("            margin-bottom: 20px;\r\n");
+        html.push_str("            border-bottom: 3px solid #fff;\r\n");
+        html.push_str("            padding-bottom: 10px;\r\n");
+        html.push_str("            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);\r\n");
+        html.push_str("        }\r\n");
+        html.push_str("        .button-container {\r\n");
+        html.push_str("            display: flex;\r\n");
+        html.push_str("            flex-direction: column;\r\n");
+        html.push_str("            align-items: center;\r\n");
+        html.push_str("            gap: 10px;\r\n");
+        html.push_str("        }\r\n");
+        html.push_str("        .button-container button {\r\n");
+        html.push_str("            font-size: 16px;\r\n");
+        html.push_str("            padding: 10px 20px;\r\n");
+        html.push_str("            border: none;\r\n");
+        html.push_str("            border-radius: 8px;\r\n");
+        html.push_str("            cursor: pointer;\r\n");
+        html.push_str("            color: #fff;\r\n");
+        html.push_str("            font-weight: bold;\r\n");
+        html.push_str("            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);\r\n");
+        html.push_str("            transition: transform 0.2s ease, box-shadow 0.2s ease;\r\n");
+        html.push_str("        }\r\n");
+        html.push_str("        .button-container button:hover {\r\n");
+        html.push_str("            transform: scale(1.1);\r\n");
+        html.push_str("            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);\r\n");
+        html.push_str("        }\r\n");
+        html.push_str("        .color-1 { background-color: #ff6b6b; }\r\n");
+        html.push_str("        .color-1:hover { background-color: #ff4b4b; }\r\n");
+        html.push_str("        .color-2 { background-color: #48dbfb; }\r\n");
+        html.push_str("        .color-2:hover { background-color: #33c7f2; }\r\n");
+        html.push_str("        .color-3 { background-color: #1dd1a1; }\r\n");
+        html.push_str("        .color-3:hover { background-color: #10b892; }\r\n");
+        html.push_str("        .color-4 { background-color: #feca57; }\r\n");
+        html.push_str("        .color-4:hover { background-color: #fdb844; }\r\n");
+        html.push_str("        .color-5 { background-color: #ff9ff3; }\r\n");
+        html.push_str("        .color-5:hover { background-color: #ff7eea; }\r\n");
+        html.push_str("        @keyframes gradientAnimation {\r\n");
+        html.push_str("            0% { background-position: 0% 50%; }\r\n");
+        html.push_str("            50% { background-position: 100% 50%; }\r\n");
+        html.push_str("            100% { background-position: 0% 50%; }\r\n");
+        html.push_str("        }\r\n");
+        html.push_str("    </style>\r\n");
+        html.push_str("</head>\r\n");
+        html.push_str("<body>\r\n");
+        html.push_str(&format!("    <h1>Index of {dir_name}</h1>\r\n"));
+        html.push_str("    <div class=\"button-container\">\r\n");
+        html.push_str(&files_ref);
+        html.push_str("    <div style=\"margin-top: 20px; text-align: center;\">\r\n");
+        html.push_str("        <button class=\"color-1\" onclick=\"window.history.back()\">Go Back</button>\r\n");
+        html.push_str("    </div>\r\n");
+        html.push_str("    </div>\r\n");
+
+        html.push_str("</body>\r\n");
+        html.push_str("</html>\r\n");
+        let mut response = Response::new(ResponseCode::new(200, "OK"));
+
+        response.set_content(html);
+
+        Ok(response)
+    }
+
+    fn format_file_ref(files: Vec<String>) -> String {
+        let mut html = String::new();
+
+        let mut color_index: usize = 2;
+        for file_name in files {
+            let color_class = format!("color-{}", color_index.to_string());
+            color_index = (color_index % 5) + 1;
+
+            html.push_str(&format!(
+                r#"        <button class="{}" onclick="window.location.href='{}'">{}</button>"#,
+                color_class,
+                // dir.to_string_lossy().to_string(),
+                file_name,
+                file_name
+            ));
+            html.push_str("\r\n");
+        }
+
+        html
+    }
+
+    async fn html_files_ref_from(dir: &PathBuf) -> io::Result<Vec<String>> {
+        let mut files = vec![];
+
+        let mut entries = fs::read_dir(dir).await?;
+        let dir_str = dir.to_string_lossy().to_string();
+
+        while let Some(entry) = entries.next_entry().await? {
+            let filename = entry.file_name();
+            let filename = match filename.to_str() {
+                Some(name) => name,
+                None => continue,
+            };
+
+            if filename.starts_with(".") {
+                continue;
+            }
+
+            files.push(filename.to_owned());
+        }
+
+        files.sort();
+
+        Ok(files)
+    }
 
     pub async fn send_body_to_cgi(
         request: &Request,
@@ -551,7 +727,7 @@ mod utils {
             let end = n - read_too_much;
 
             stdin.write_all(&buffer[..end]).await?;
-            return Ok(String::from_utf8_lossy(&buffer[end..]).to_string());
+            return Ok(String::from_utf8_lossy(&buffer[end..end + read_too_much]).to_string());
         } else {
             return Err(io::Error::new(
                 ErrorKind::BrokenPipe,
@@ -622,7 +798,7 @@ mod utils {
         let read_too_much = read - len;
         let end = n - read_too_much;
 
-        return Ok(String::from_utf8_lossy(&buffer[end..]).to_string());
+        return Ok(String::from_utf8_lossy(&buffer[end..end + read_too_much]).to_string());
     }
 
     pub enum UploadType {

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Index of pages</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #1e3c72, #2a5298, #f6d365, #fda085);
+            background-size: 300% 300%;
+            animation: gradientAnimation 15s ease infinite;
+            color: #fff;
+        }
+        h1 {
+            color: #fff;
+            font-size: 24px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #fff;
+            padding-bottom: 10px;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .button-container button {
+            font-size: 16px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #fff;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .button-container button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        .color-1 { background-color: #ff6b6b; }
+        .color-1:hover { background-color: #ff4b4b; }
+        .color-2 { background-color: #48dbfb; }
+        .color-2:hover { background-color: #33c7f2; }
+        .color-3 { background-color: #1dd1a1; }
+        .color-3:hover { background-color: #10b892; }
+        .color-4 { background-color: #feca57; }
+        .color-4:hover { background-color: #fdb844; }
+        .color-5 { background-color: #ff9ff3; }
+        .color-5:hover { background-color: #ff7eea; }
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Index of pages</h1>
+    <div class="button-container">
+    </div>
+        <button class="color-2" onclick="window.location.href='/pages/code.html'">code.html</button>
+        <button class="color-3" onclick="window.location.href='/pages/fractal.html'">fractal.html</button>
+        <button class="color-4" onclick="window.location.href='/pages/upload.html'">upload.html</button>
+    <div style="margin-top: 20px; text-align: center;">
+        <button class="color-1" onclick="window.history.back()">Go Back</button>
+    </div>
+</body>
+</html>

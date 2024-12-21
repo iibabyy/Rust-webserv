@@ -207,6 +207,7 @@ pub mod parsing {
         }
 
         let extension = value[0].clone();
+        let extension = extension.trim_start_matches(".").to_string();
         let path = PathBuf::from(&value[1]);
 
         if path.is_file() == false {

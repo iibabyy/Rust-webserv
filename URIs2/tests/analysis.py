@@ -13,9 +13,9 @@ gender = params.get('gender', [None])[0]
 
 birthdate_str = params.get('birthdate', [None])[0]
 if birthdate_str:
-	birthdate = datetime.strptime(birthdate_str, '%Y-%m-%d').date()
+    birthdate = datetime.strptime(birthdate_str, '%Y-%m-%d').date()
 else:
-	birthdate = None
+    birthdate = None
 
 height = float(params.get('height', [0])[0]) if params.get('height') else None
 weight = float(params.get('weight', [0])[0]) if params.get('weight') else None

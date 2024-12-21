@@ -2,8 +2,10 @@ use std::{
     collections::HashMap,
     io::{self, Error, ErrorKind},
     net::IpAddr,
+    process::Output,
 };
 
+use nom::AsBytes;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -115,7 +117,7 @@ impl Listener {
             raw.push_str(std::str::from_utf8(&buffer[..n])?);
 
             while let Some((header, raw_left)) = raw.split_once("\r\n\r\n") {
-                eprintln!("\n\n\nIncoming request");
+                eprintln!("\n\n\n----[ Incoming request ]----");
                 raw = match Self::handle_request(
                     header,
                     &mut stream,
@@ -225,43 +227,51 @@ impl Listener {
         server: &Server,
         raw_left: &mut str,
     ) -> Option<String> {
+        eprintln!("executing CGI");
+
         let (output, raw_left) = match server.execute_cgi(request, stream, raw_left).await {
             Ok(res) => res,
             Err(err) => {
-                println!("Error: sending response: {err}");
+                eprintln!(
+                    "Error : {}: sending response: {err}",
+                    request.path().display()
+                );
                 Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
-                return if request.keep_connection_alive() == true {
-                    Some(raw_left.to_owned())
+                if request.keep_connection_alive() == true && err.kind() != ErrorKind::UnexpectedEof
+                {
+                    return Some(raw_left.to_owned());
                 } else {
-                    None
+                    return None;
                 };
             }
         };
 
-        match stream.write_all(&output.stdout).await {
+        eprintln!("sending CGI response");
+        match Self::send_cgi_response(output, stream).await {
             Ok(_) => (),
             Err(err) => {
                 println!("Error: sending response: {err}");
                 Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
-                return if request.keep_connection_alive() == true
-                    && err.kind() != ErrorKind::UnexpectedEof
+                if request.keep_connection_alive() == true && err.kind() != ErrorKind::UnexpectedEof
                 {
-                    Some(raw_left.to_owned())
+                    return Some(raw_left.to_owned());
                 } else {
-                    None
+                    return None;
                 };
             }
         }
 
+        eprintln!("CGI response send !");
+
         Some(raw_left)
     }
 
-    // async fn execute_cgi(
-    // 	request: &Request,
-    // 	// stream: &mut TcpStream,
-    // 	server: &Server,
-    // 	raw_left: &str,
-    // )
+    async fn send_cgi_response(cgi_output: Output, stream: &mut TcpStream) -> io::Result<()> {
+        stream.write_all("HTTP/1.1 200 OK\r\n".as_bytes()).await?;
+
+        // eprintln!("CGI response: \n{:#?}", String::from_utf8_lossy(cgi_output.stdout.as_bytes()).to_string());
+        stream.write_all(&cgi_output.stdout).await
+    }
 
     async fn send_error_response(stream: &mut TcpStream, code: ResponseCode) {
         let mut response = Response::new(code);

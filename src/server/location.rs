@@ -293,9 +293,9 @@ impl Location {
         if self.max_body_size.is_none() && server.max_body_size().is_some() {
             self.max_body_size = Some(server.max_body_size().unwrap().clone());
         }
-        if self.methods.is_none() && server.methods().is_some() {
-            self.methods = Some(server.methods().unwrap().clone());
-        }
+        // if self.methods.is_none() && server.methods().is_some() {
+        //     self.methods = Some(server.methods().unwrap().clone());
+        // }
         if self.return_.is_none() && server.return_().is_some() {
             self.return_ = Some(server.return_().unwrap().clone());
         }

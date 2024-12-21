@@ -105,10 +105,17 @@ fn block(input: &str) -> IResult<&str, ServerBlock> {
                             nom::error::ErrorKind::Fail,
                         )));
                     }
-                    cgi.insert(
-                        directive.1[0].clone(),
-                        PathBuf::from(directive.1[1].as_str()),
-                    );
+
+                    let extension = if directive.1[0].starts_with(".") {
+                        directive.1[0][1..].to_string()
+                    } else {
+                        return Err(nom::Err::Error(nom::error::Error::new(
+                            input,
+                            nom::error::ErrorKind::Fail,
+                        )));
+                    };
+
+                    cgi.insert(extension, PathBuf::from(directive.1[1].as_str()));
                 } else {
                     directives.insert(directive.0, directive.1);
                 }
@@ -172,10 +179,12 @@ fn location_block(mut input: &str) -> IResult<&str, LocationBlock> {
                     nom::error::ErrorKind::Fail,
                 )));
             }
-            cgi.insert(
-                directive.1[0].clone(),
-                PathBuf::from(directive.1[1].as_str()),
-            );
+            let extension = if directive.1[0].starts_with(".") {
+                directive.1[0][1..].to_string()
+            } else {
+                directive.1[0].to_string()
+            };
+            cgi.insert(extension, PathBuf::from(directive.1[1].as_str()));
         } else {
             infos.insert(directive.0, directive.1);
         }
@@ -201,7 +210,7 @@ pub fn config(input: &str) -> IResult<&str, Vec<ServerBlock>> {
     let input = skip_whitespaces(input);
     if input.is_empty() == false {
         Err(nom::Err::Error(nom::error::Error::new(
-            input,
+            "File not entirely readed",
             nom::error::ErrorKind::Fail,
         )))
     } else {
