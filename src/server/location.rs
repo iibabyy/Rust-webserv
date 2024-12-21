@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use super::{config::Config, parsing};
+use super::{config::Config, handler::Handler, parsing};
 
 use crate::{request::Method, LocationBlock};
 
@@ -32,6 +32,8 @@ pub struct Location {
     infos: HashMap<String, Vec<String>>,
     server: Option<Arc<Server>>,
 }
+
+impl Handler for Location {}
 
 impl Config for Location {
     fn path(&self) -> &PathBuf /*----------------------------------*/ {

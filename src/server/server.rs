@@ -14,7 +14,7 @@ use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 
 use crate::{request::Method, LocationBlock, ServerBlock};
 
-use super::{config::Config, location::Location, parsing};
+use super::{config::Config, handler::Handler, location::Location, parsing};
 
 /*---------------------------------------------------------------*/
 /*-------------------------[ SERVER ]----------------------------*/
@@ -42,6 +42,8 @@ pub struct Server {
     cgi: HashMap<String, PathBuf>,
     locations: HashMap<PathBuf, Location>,
 }
+
+impl Handler for Server {}
 
 impl Config for Server {
     fn path(&self) -> &PathBuf /*----------------------------------*/ {

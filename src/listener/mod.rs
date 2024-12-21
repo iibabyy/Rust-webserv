@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     request::Request,
     response::response::{Response, ResponseCode},
-    server::{config::Config, server::Server},
+    server::{config::Config, handler::Handler, location::Location, server::Server},
 };
 
 pub struct Listener {
@@ -143,11 +143,11 @@ impl Listener {
         servers: &Vec<Server>,
         raw_left: &mut str,
     ) -> Option<String> {
-        let mut request = match Request::try_from(header) {
+        let request = match Request::try_from(header) {
             Ok(request) => request,
             Err(err) => {
                 eprintln!("Error: deserializing header: {}", err.to_string());
-                Self::send_error_response(stream, err).await;
+                send_error_response(stream, err).await;
                 return Some(raw_left.to_string());
                 // send error response bad request
             }
@@ -155,142 +155,13 @@ impl Listener {
 
         let server = Self::choose_server_from(&request, servers);
 
-        match server.parse_request(&mut request) {
-            Ok(_) => (),
-            Err(err) => {
-                eprintln!("Error: parsing request: {}", err.to_string());
-                Self::send_error_response(stream, err).await;
-                return if request.keep_connection_alive() == true {
-                    Some(raw_left.to_string())
-                } else {
-                    None
-                };
-            }
-        }
-
-        let raw_left = if server.is_cgi(&request) {
-            Self::handle_cgi(&request, stream, server, raw_left).await
+        let raw_left = if let Some(location) = server.get_request_location(&request) {
+            location.handle_request(request, stream, raw_left).await
         } else {
-            Self::handle_non_cgi(&request, stream, server, raw_left).await
+            server.handle_request(request, stream, raw_left).await
         };
 
         return raw_left;
-    }
-
-    async fn handle_non_cgi(
-        request: &Request,
-        stream: &mut TcpStream,
-        server: &Server,
-        raw_left: &mut str,
-    ) -> Option<String> {
-        let raw_left = match server.handle_body_request(&request, stream, raw_left).await {
-            Ok(raw_left) => raw_left,
-            Err(err) => {
-                match err.kind() {
-                    ErrorKind::UnexpectedEof => return None, // end of stream
-
-                    _ => {
-                        println!("Error: handling body: {}", err.to_string());
-                        Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
-
-                        if request.keep_connection_alive() == true {
-                            return Some(raw_left.to_string()); // keep stream alive
-                        } else {
-                            return None; // kill stream
-                        };
-                    }
-                }
-            }
-        };
-
-        match Self::send_response(server, stream, &request).await {
-            Ok(_) => (),
-            Err(err) => {
-                println!("Error: sending response: {err}");
-                Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
-                return if request.keep_connection_alive() == true
-                    && err.kind() != ErrorKind::UnexpectedEof
-                {
-                    Some(raw_left)
-                } else {
-                    None
-                };
-            }
-        }
-
-        Some(raw_left)
-    }
-
-    async fn handle_cgi(
-        request: &Request,
-        stream: &mut TcpStream,
-        server: &Server,
-        raw_left: &mut str,
-    ) -> Option<String> {
-        eprintln!("executing CGI");
-
-        let (output, raw_left) = match server.execute_cgi(request, stream, raw_left).await {
-            Ok(res) => res,
-            Err(err) => {
-                eprintln!(
-                    "Error : {}: sending response: {err}",
-                    request.path().display()
-                );
-                Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
-                if request.keep_connection_alive() == true && err.kind() != ErrorKind::UnexpectedEof
-                {
-                    return Some(raw_left.to_owned());
-                } else {
-                    return None;
-                };
-            }
-        };
-
-        eprintln!("sending CGI response");
-        match Self::send_cgi_response(output, stream).await {
-            Ok(_) => (),
-            Err(err) => {
-                println!("Error: sending response: {err}");
-                Self::send_error_response(stream, ResponseCode::from_error(&err)).await;
-                if request.keep_connection_alive() == true && err.kind() != ErrorKind::UnexpectedEof
-                {
-                    return Some(raw_left.to_owned());
-                } else {
-                    return None;
-                };
-            }
-        }
-
-        eprintln!("CGI response send !");
-
-        Some(raw_left)
-    }
-
-    async fn send_cgi_response(cgi_output: Output, stream: &mut TcpStream) -> io::Result<()> {
-        stream.write_all("HTTP/1.1 200 OK\r\n".as_bytes()).await?;
-
-        // eprintln!("CGI response: \n{:#?}", String::from_utf8_lossy(cgi_output.stdout.as_bytes()).to_string());
-        stream.write_all(&cgi_output.stdout).await
-    }
-
-    async fn send_error_response(stream: &mut TcpStream, code: ResponseCode) {
-        let mut response = Response::new(code);
-
-        let _ = response.send(stream).await;
-    }
-
-    async fn send_response(
-        server: &Server,
-        stream: &mut TcpStream,
-        request: &Request,
-    ) -> Result<(), Error> {
-        let mut response = if let Some(location) = server.get_request_location(request) {
-            location.build_response(request).await?
-        } else {
-            server.build_response(request).await?
-        };
-
-        response.send(stream).await
     }
 
     fn choose_server_from<'a>(request: &Request, servers: &'a Vec<Server>) -> &'a Server {
@@ -320,4 +191,10 @@ impl Listener {
 
         return servers.first().unwrap();
     }
+}
+
+pub async fn send_error_response(stream: &mut TcpStream, code: ResponseCode) {
+    let mut response = Response::new(code);
+
+    let _ = response.send(stream).await;
 }

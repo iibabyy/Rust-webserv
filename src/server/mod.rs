@@ -1,4 +1,7 @@
+use config::Config;
+
 pub mod config;
+pub mod handler;
 pub mod location;
 pub mod server;
 
