@@ -1,6 +1,4 @@
-use std::{
-    collections::HashMap, io, net::IpAddr
-};
+use std::{collections::HashMap, io, net::IpAddr};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -11,7 +9,10 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     request::Request,
     response::response::{Response, ResponseCode},
-    server::{server::Server, traits::{config::Config, handler::Handler}},
+    server::{
+        server::Server,
+        traits::{config::Config, handler::Handler},
+    },
 };
 
 pub struct Listener {
@@ -162,6 +163,8 @@ impl Listener {
 
     fn choose_server_from<'a>(request: &Request, servers: &'a Vec<Server>) -> &'a Server {
         let mut default = None;
+
+		eprintln!("request:\n{request:#?}");
 
         if request.host().is_some() {
             let hostname = request.host().unwrap();

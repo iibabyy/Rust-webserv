@@ -1,16 +1,10 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    path::PathBuf,
-};
-
+use std::{borrow::Cow, collections::HashMap, path::PathBuf};
 
 use crate::{
     request::{Method, Request},
     response::response::ResponseCode,
     server::location::Location,
 };
-
 
 #[allow(dead_code)]
 pub trait Config {
@@ -495,7 +489,7 @@ pub mod utils {
     }
 
     pub fn choose_upload_type(request: &Request) -> UploadType {
-        let content_type = request.get("Content-Type");
+        let content_type = request.content_type();
 
         if content_type.is_none() {
             return UploadType::Normal;

@@ -1,7 +1,6 @@
-
-pub mod traits;
 pub mod location;
 pub mod server;
+pub mod traits;
 
 /*------------------------------------------------------------*/
 /*-------------------[ Config Parsing ]-----------------------*/

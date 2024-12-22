@@ -1,9 +1,0 @@
-------WebKitFormBoundaryQphxzMl4yvYqU3y3
-Content-Disposition: form-data; name="fileUpload[]"; filename="infinite.py"
-Content-Type: application/octet-stream
-
-#!/usr/bin/python3
-
-while (1):
-	pass
-------WebKitFormBoundaryQphxzMl4yvYqU3y3--

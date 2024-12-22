@@ -180,7 +180,7 @@ impl Request {
             match name {
                 "Host" => {
                     if self.host.is_none() {
-                        self.host = Some(value.to_owned())
+                    	self.host = Some(value.trim().to_owned())
                     } else {
                         return Err("duplicate header: Host".to_owned());
                     }

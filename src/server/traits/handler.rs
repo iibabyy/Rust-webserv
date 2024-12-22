@@ -18,8 +18,10 @@ use crate::{
     response::response::{Response, ResponseCode},
 };
 
-use super::config::{utils, Config};
-
+use super::config::{
+    utils::{self, UploadType},
+    Config,
+};
 
 pub trait Handler: Config {
     async fn handle_request(
@@ -28,6 +30,7 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         raw_left: &mut str,
     ) -> Option<String> {
+		eprintln!("Request: {request:#?}");
         match self.parse_request(&mut request) {
             Ok(location) => location,
             Err(err) => {
@@ -172,45 +175,116 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         raw_left: &str,
     ) -> Result<String, io::Error> {
+        eprintln!("uploading file");
+
         if self.upload_folder().is_none() {
+            eprintln!("no upload folder");
             return Err(io::Error::new(ErrorKind::NotFound, "No upload folder"));
+        } else if request.content_length().is_none() {
+            eprintln!("No content length -> No upload");
+            return Ok(raw_left.to_owned());
         }
 
         let upload_folder = self.upload_folder().unwrap();
 
         if upload_folder.exists() == false {
+            eprintln!("no upload folder");
             return Err(io::Error::new(
                 ErrorKind::NotFound,
                 "Upload folder not found",
             ));
         }
 
-        match utils::choose_upload_type(request) {
-            // UploadType::Multipart => todo!(),
+        let res = match utils::choose_upload_type(request) {
+            UploadType::Multipart => {
+                self.handle_mutlipart_upload(request, stream, raw_left, upload_folder)
+                    .await
+            }
             _ => {
                 self.upload_default_content(request, stream, raw_left, upload_folder)
                     .await
             }
-        }
+        };
+
+        eprintln!("finish upload");
+        return res;
     }
 
     /*------------------------------------------------------------*/
     /*------------------[ Multipart Upload ]----------------------*/
     /*------------------------------------------------------------*/
 
-    // async fn upload_mutipart_content(
-    //	 &self,
-    //	 request: &Request,
-    //	 stream: &mut TcpStream,
-    //	 raw_left: &str,
-    //	 upload_folder: &PathBuf,
-    // ) -> Result<String, io::Error> {
-    // 	let boundary = match utils::extract_boundary(request.content_type()) {
-    // 		Some(boundary) => boundary,
-    // 		None => return Err(io::Error::new(ErrorKind::InvalidInput, "boundary not found")),
-    // 	};
+    async fn handle_mutlipart_upload(
+        &self,
+        request: &Request,
+        stream: &mut TcpStream,
+        raw_left: &str,
+        upload_folder: &PathBuf,
+    ) -> Result<String, io::Error> {
+        let boundary = match utils::extract_boundary(request.content_type()) {
+            Some(boundary) => boundary,
+            None => {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidInput,
+                    "boundary not found",
+                ))
+            }
+        };
+        eprintln!("boundary: {boundary}");
 
-    // }
+        self.upload_default_content(request, stream, raw_left, upload_folder).await
+    }
+
+	async fn upload_multipart_content(stream: &mut TcpStream, length_missing: usize, raw_left: &str, boundary: String) -> io::Result<(String, String)> {
+		if let Some((header, left)) = raw_left.split_once("\r\n\r\n") { return Ok((header.to_owned(), left.to_owned())) }
+		
+		let readed = 0;
+		let raw = raw_left.to_owned();
+		let mut buffer = String::new();
+		let mut n;
+
+		while readed < length_missing {
+			raw = Self::read_at_least(boundary.len() + 2, stream, &raw).await?;
+			if raw.starts_with(boundary) == false {
+				return Err(io::Error::new(ErrorKind::InvalidData, "expected boundary"))
+			}
+
+			raw.
+
+
+			// read header
+			// read body
+
+		}
+	}
+
+	async fn read_at_least(to_read: usize, stream: &mut TcpStream, raw_left: &str) -> io::Result<String> {
+		if raw_left.len() >= to_read { return Ok(raw_left.to_string()) }
+
+		let mut buffer = [0; 65536];
+		let mut readed = raw_left.len();
+		let mut raw_left = raw_left.to_owned();
+
+		while readed < to_read {
+			let n = stream.read(&mut buffer).await?;
+
+			readed += n;
+			raw_left.push_str(&String::from_utf8_lossy(buffer.as_slice()));
+		}
+
+		Ok(raw_left)
+	}
+
+    async fn deserialize_multipart_header(
+        &self,
+        request: &Request,
+        stream: &mut TcpStream,
+        raw_left: &str,
+        upload_folder: &PathBuf,
+        boundary: String,
+    ) {
+        loop {}
+    }
 
     /*------------------------------------------------------------*/
     /*-------------------[ Default Upload ]-----------------------*/
