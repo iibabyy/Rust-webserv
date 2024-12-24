@@ -43,7 +43,7 @@ pub trait Config {
 
         self.parse_method(request)?;
 
-        if request.content_length() > self.max_body_size() {
+        if self.max_body_size().is_some() && request.content_length() > self.max_body_size() {
             return Err(ResponseCode::from_code(413));
         }
 
@@ -193,7 +193,10 @@ pub trait Config {
 #[allow(dead_code)]
 pub mod utils {
     use std::{
-        fmt::format, io::{self, ErrorKind}, path::PathBuf, usize
+        fmt::format,
+        io::{self, ErrorKind},
+        path::PathBuf,
+        usize,
     };
 
     use tokio::{

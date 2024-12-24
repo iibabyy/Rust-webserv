@@ -141,30 +141,6 @@ impl Server {
 
         Ok(serv)
     }
-
-    // async fn read_from(mut stream: impl AsyncRead + Unpin) -> Result<String, Error> {
-    //	 let mut buffer = [0; 65536];
-
-    //	 match stream.read(&mut buffer).await {
-    //		 Ok(n) => Ok(String::from_utf8_lossy(&buffer[..n]).into_owned()),
-    //		 Err(e) => Err(e),
-    //	 }
-    // }
-
-    // async fn create_request_from(&mut self, stream: &mut TcpStream) -> Result<Request, ()> {
-    // 	let mut buffer = [0;65536];
-
-    // 	let buffer = match stream.read(&mut buffer).await {
-    // 		Ok(n) => String::from_utf8_lossy(&buffer[..n]).into_owned(),
-    // 		Err(_) => return Err(()),
-    // 	};
-
-    // 	match Request::try_from(buffer) {
-    // 		Ok(request) => Ok(request),
-    // 		Err(_) => Err(())
-    // 	}
-
-    // }
 }
 
 /*---------------------------------------------------------------*/
@@ -180,6 +156,43 @@ impl Server {
         }
 
         Ok(servers)
+    }
+
+    pub fn parse_servers(servers: Vec<Self>) -> Result<HashMap<u16, Vec<Server>>, String> {
+        let mut map: HashMap<u16, Vec<Self>> = HashMap::new();
+
+        let mut i = 1;
+        for serv in servers {
+            let port = match serv.parse() {
+                Ok(port) => port,
+                Err(err) => return Err(format!("server {i}: {err}")),
+            };
+
+            if let Some(vec) = map.get_mut(&port) {
+                vec.push(serv);
+            } else {
+                map.insert(port, vec![serv]);
+            }
+            i += 1;
+        }
+
+        for (port, vec) in &map {
+            if vec.iter().filter(|serv| serv.default == true).count() > 1 {
+                return Err(format!("port {port}: multiple default servers"));
+            }
+        }
+
+        Ok(map)
+    }
+
+    fn parse(&self) -> Result<u16, String> {
+        if self.port.is_none() {
+            return Err(String::from("no listen"));
+        }
+
+        // others checks ? (only one default by port)
+
+        Ok(self.port.unwrap())
     }
 
     fn add_directive(&mut self, name: String, infos: Vec<String>) -> Result<(), String> {

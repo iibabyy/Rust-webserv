@@ -25,8 +25,8 @@ use super::config::{
 };
 
 pub struct MultipartFile {
-	filename: String,
-	content_type: Option<String>,
+    filename: String,
+    content_type: Option<String>,
 }
 
 pub trait Handler: Config {
@@ -36,7 +36,7 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         raw_left: &mut str,
     ) -> Option<String> {
-		// eprintln!("Request: {request:#?}");
+        // eprintln!("Request: {request:#?}");
         match self.parse_request(&mut request) {
             Ok(location) => location,
             Err(err) => {
@@ -238,182 +238,238 @@ pub trait Handler: Config {
         };
         eprintln!("boundary: {boundary}");
 
-        Self::upload_multipart_content(stream, request.content_length().unwrap().clone(), raw_left, boundary, upload_folder).await
+        Self::upload_multipart_content(
+            stream,
+            request.content_length().unwrap().clone(),
+            raw_left,
+            boundary,
+            upload_folder,
+        )
+        .await
     }
 
-	async fn upload_multipart_content(stream: &mut TcpStream, content_len: usize, raw_left: &str, boundary: String, upload_folder: &PathBuf) -> io::Result<String> {
-		let mut readed = 0;
+    async fn upload_multipart_content(
+        stream: &mut TcpStream,
+        content_len: usize,
+        raw_left: &str,
+        boundary: String,
+        upload_folder: &PathBuf,
+    ) -> io::Result<String> {
+        let mut readed = 0;
 
-		let mut raw_left = raw_left.to_owned();
+        let mut raw_left = raw_left.to_owned();
 
-		while readed < content_len {
-			let index;
-			(raw_left, index) = Self::read_until_find(
-				&boundary,
-				content_len - readed,
-				&raw_left,
-				stream
-			).await?;
+        while readed < content_len {
+            let index;
+            (raw_left, index) =
+                Self::read_until_find(&boundary, content_len - readed, &raw_left, stream).await?;
 
-			if index != Some(0) {
-				return Err(io::Error::new(ErrorKind::InvalidData, "expected boundary"))
-			}
+            if index != Some(0) {
+                return Err(io::Error::new(ErrorKind::InvalidData, "expected boundary"));
+            }
 
-			let mut temp = &raw_left[boundary.len()..];
-			readed += boundary.len();
+            let mut temp = &raw_left[boundary.len()..];
+            readed += boundary.len();
 
-			if temp.starts_with("--") {
-				return Ok(temp[4..].to_owned())
-			} if temp.starts_with("\r\n") {
-				temp = &temp[2..];
-				readed += 2;
-			} else {
-				return Err(io::Error::new(ErrorKind::InvalidData, "invalid boundary"))
-			}
+            if temp.starts_with("--") {
+                readed += 4;
+                if readed == content_len {
+                    return Ok(temp[4..].to_owned());
+                } else {
+                    return Err(io::Error::new(
+                        ErrorKind::InvalidData,
+                        "Invalid Content length",
+                    ));
+                }
+            }
+            if temp.starts_with("\r\n") {
+                temp = &temp[2..];
+                readed += 2;
+            } else {
+                return Err(io::Error::new(ErrorKind::InvalidData, "invalid boundary"));
+            }
 
-			let file;
-			let read;
-			(file, raw_left, read) = Self::deserialize_multipart_header(
-				content_len - readed,
-				stream,
-				temp
-			).await?;
-			
-			readed += read;
+            let file;
+            let read;
+            (file, raw_left, read) =
+                Self::deserialize_multipart_header(content_len - readed, stream, temp).await?;
 
-			let read;
-			(raw_left, read) = if file.is_none() { continue }
-			else {
-				Self::create_and_upload(
-					file.unwrap(),
-					raw_left,
-					stream,
-					upload_folder,
-					&boundary
-				).await?
-			};
-			readed += read;
-		}
+            readed += read;
 
-		Ok(raw_left)
-	}
+            let read;
+            (raw_left, read) =
+                Self::create_and_upload(file, raw_left, stream, upload_folder, &boundary).await?;
+            readed += read;
+        }
 
-	async fn create_and_upload(file: MultipartFile, raw_left: String, stream: &mut TcpStream, upload_folder: &PathBuf, boundary: &str) -> io::Result<(String, usize)> {
-		let mut file = OpenOptions::new()
-			.write(true)
-			.read(true)
-			.create(true)
-			.truncate(true)
-			.open(PathBuf::from(format!(
-				"{}/{}",
-				upload_folder.to_string_lossy().to_string(),
-				file.filename
-			))).await?;
-			
-		if let Some(index) = raw_left.find(boundary) {
-			file.write_all(raw_left[..index - 2].as_bytes()).await?;
-			return Ok((raw_left[index..].to_string().to_string(), index))
-		}
+        Ok(raw_left)
+    }
 
-		let boundary = boundary.as_bytes();
-		let raw_left = raw_left.as_bytes();
-		let mut readed = 0;
-		
+    async fn create_and_upload(
+        file: MultipartFile,
+        raw_left: String,
+        stream: &mut TcpStream,
+        upload_folder: &PathBuf,
+        boundary: &str,
+    ) -> io::Result<(String, usize)> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create(true)
+            .truncate(true)
+            .open(PathBuf::from(format!(
+                "{}/{}",
+                upload_folder.to_string_lossy().to_string(),
+                file.filename
+            )))
+            .await?;
 
-		loop {
-			let mut buffer = [0; 65536];
+        if let Some(index) = raw_left.find(boundary) {
+            file.write_all(raw_left[..index - 2].as_bytes()).await?;
+            return Ok((raw_left[index..].to_string(), index));
+        }
 
-			let n = stream.read(&mut buffer).await?;
-			
-			let mut raw_left = raw_left.to_vec();
-			raw_left.append(&mut buffer[..n].to_vec());
-			let raw_left = raw_left.as_bytes();
-			
-			if let Some(index) = raw_left.find_substring(boundary) {
-				file.write_all(&raw_left[..index - 2]).await?;
-				readed += index;
-				return Ok((String::from_utf8_lossy(&raw_left[index..]).to_string(), readed))
-			}
+        let boundary = boundary.as_bytes();
+        let mut raw_left = raw_left.as_bytes();
+        let mut readed = 0;
+        let mut temp;
 
-			let security = if raw_left.len() > boundary.len() {raw_left.len() - boundary.len()} else { 0 };
-			file.write_all(&raw_left[..security]).await?;
-			readed += security;
-		}
-		
-	}
+        loop {
+            let mut buffer = [0; 65536];
+
+            let n = stream.read(&mut buffer).await?;
+
+            temp = raw_left.to_vec();
+            temp.append(&mut buffer[..n].to_vec());
+            raw_left = temp.as_bytes();
+
+            if let Some(index) = raw_left.find_substring(boundary) {
+                file.write_all(&raw_left[..index - 2]).await?;
+                readed += index;
+                return Ok((
+                    String::from_utf8_lossy(&raw_left[index..]).to_string(),
+                    readed,
+                ));
+            }
+
+            let security = if raw_left.len() > boundary.len() {
+                raw_left.len() - boundary.len()
+            } else {
+                0
+            };
+            file.write_all(&raw_left[..security]).await?;
+            readed += security;
+            raw_left = &raw_left[security..];
+        }
+    }
 
     async fn deserialize_multipart_header(
-		read_limit: usize,
+        read_limit: usize,
         stream: &mut TcpStream,
         raw_left: &str,
-    ) -> io::Result<(Option<MultipartFile>, String, usize)> {
-        let (raw_left, index) = Self::read_until_find(&"\r\n\r\n".to_owned(), read_limit, raw_left, stream).await?;
+    ) -> io::Result<(MultipartFile, String, usize)> {
+        let readed;
 
-		let (headers, raw_left) = match index {
-			Some(index) => {
-				(raw_left[..index + 2].to_string(), raw_left[index + 4..].to_string())
-			}
-			None => {
-				return Err(io::Error::new(ErrorKind::InvalidData, "invalid multipart content"))
-			}
-		};
+        let (raw_left, index) =
+            Self::read_until_find(&"\r\n\r\n".to_owned(), read_limit, raw_left, stream).await?;
+        let (headers, raw_left) = match index {
+            Some(index) => {
+                readed = index + 4;
+                (
+                    raw_left[..index + 2].to_string(),
+                    raw_left[index + 4..].to_string(),
+                )
+            }
+            None => {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    "invalid multipart content",
+                ))
+            }
+        };
 
-		let mut content_type = None;
-		let mut content_disposition = None;
+        let mut content_type = None;
+        let mut content_disposition = None;
 
-		for header in headers.split("\r\n") {
-			if header.starts_with("Content-Type: ") {
-				content_type = Some(header["Content-Type: ".len()..].to_string());
-			} else if header.starts_with("Content-Disposition") {
-				content_disposition = Some(header["Content-Disposition".len()..].to_string());
-			}
-		}
+        for header in headers.split("\r\n") {
+            if header.starts_with("Content-Type: ") {
+                content_type = Some(header["Content-Type: ".len()..].to_string());
+            } else if header.starts_with("Content-Disposition") {
+                content_disposition = Some(header["Content-Disposition".len()..].to_string());
+            }
+        }
 
-		let readed = headers.len();
+        if content_disposition.is_none() {
+            return Ok((
+                MultipartFile {
+                    filename: "temp".to_owned(),
+                    content_type,
+                },
+                raw_left,
+                readed,
+            ));
+        }
+        let content_disposition = content_disposition.unwrap();
 
-		if content_disposition.is_none() { return Ok((None, raw_left, readed)) }
-		let content_disposition = content_disposition.unwrap();
+        let filename_index = content_disposition.find("filename=");
+        let filename = if filename_index.is_none() {
+            "\"temp\""
+        } else {
+            let filename_index = filename_index.unwrap() + "filename=".len();
+            &content_disposition[filename_index..]
+        };
 
-		let filename_index = content_disposition.find("filename=");
-		if filename_index.is_none() { return Ok((None, raw_left, readed)) }
-		let filename_index = filename_index.unwrap() + "filename=".len();
+        if filename.starts_with("\"") == false || filename.ends_with("\"") == false {
+            return Err(io::Error::new(ErrorKind::InvalidData, "invalid filename"));
+        }
 
-		let filename = &content_disposition[filename_index..];
+        let filename = filename[1..filename.len() - 1].to_string();
 
-		if filename.starts_with("\"") == false || filename.ends_with("\"") == false {
-			return Err(io::Error::new(ErrorKind::InvalidData, "invalid filename"))
-		}
-
-		let filename = filename[1..filename.len() - 1].to_string();
-
-		return Ok((Some(MultipartFile{filename, content_type}), raw_left, readed))
-
+        return Ok((
+            MultipartFile {
+                filename,
+                content_type,
+            },
+            raw_left,
+            readed,
+        ));
     }
 
-	async fn read_until_find(to_find: &str, read_limit: usize, raw_left: &str, stream: &mut TcpStream) -> io::Result<(String, Option<usize>)> {
-		if let Some(index) = raw_left.find(to_find) { return Ok((raw_left.to_owned(), Some(index))) }
+    async fn read_until_find(
+        to_find: &str,
+        read_limit: usize,
+        raw_left: &str,
+        stream: &mut TcpStream,
+    ) -> io::Result<(String, Option<usize>)> {
+        if let Some(index) = raw_left.find(to_find) {
+            return Ok((raw_left.to_owned(), Some(index)));
+        }
 
-		let mut buffer = [0; 65536];
-		let mut readed = 0;
-		let mut raw_left = raw_left.to_owned();
+        let mut buffer = [0; 65536];
+        let mut readed = 0;
+        let mut raw_left = raw_left.to_owned();
 
-		while readed < read_limit {
-			let n = stream.read(&mut buffer).await?;
-			readed += n;
+        while readed < read_limit {
+            let n = stream.read(&mut buffer).await?;
+            readed += n;
 
-			let start_point =
-			if raw_left.len() < to_find.len() { 0 }
-			else { raw_left.len() - to_find.len() };
+            let start_point = if raw_left.len() < to_find.len() {
+                0
+            } else {
+                raw_left.len() - to_find.len()
+            };
 
-			raw_left.push_str(&String::from_utf8_lossy(buffer.as_slice()));
+            raw_left.push_str(&String::from_utf8_lossy(buffer.as_slice()));
 
-			if let Some(index) =  raw_left[start_point..].find(to_find) {
-				return Ok((raw_left, Some(index)));
-			} else if readed > read_limit { return Ok((raw_left, None)) }
-		}
+            if let Some(index) = raw_left[start_point..].find(to_find) {
+                return Ok((raw_left, Some(index)));
+            } else if readed > read_limit {
+                return Ok((raw_left, None));
+            }
+        }
 
-		Ok((raw_left, None))
-	}
+        Ok((raw_left, None))
+    }
 
     /*------------------------------------------------------------*/
     /*-------------------[ Default Upload ]-----------------------*/

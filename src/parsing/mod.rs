@@ -1,6 +1,6 @@
 mod config_parsing;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt::format, path::PathBuf};
 
 use config_parsing::config;
 use tokio::{fs::File, io::AsyncReadExt as _};
@@ -20,18 +20,23 @@ pub struct ServerBlock {
     pub cgi: HashMap<String, PathBuf>,
 }
 
-pub async fn get_config(path: String) -> Vec<ServerBlock> {
-    let mut file = File::open(path.as_str())
-        .await
-        .expect(format!("failed to open {} !", path).as_str());
+pub async fn get_config(path: String) -> Result<Vec<ServerBlock>, String> {
+    let mut file = match File::open(path.as_str()).await {
+        Ok(file) => file,
+        Err(err) => return Err(format!("{path}: {err}")),
+    };
     let mut content = String::new();
-    file.read_to_string(&mut content)
-        .await
-        .expect(format!("failed to read into {} !", path).as_str());
-    let (_, servers) = config(content.as_str()).expect("----[Bad config file !]----");
+    match file.read_to_string(&mut content).await {
+        Ok(_) => (),
+        Err(err) => return Err(format!("failed to read {path}: {err}")),
+    }
 
-    eprintln!("----[Parsing réussi !]----");
-    servers
+    let (_, servers) = match config(content.as_str()) {
+        Ok(config) => config,
+        Err(err) => return Err(format!("Bad config file: {err}")),
+    };
+
+    Ok(servers)
 }
 
 #[allow(unused)]

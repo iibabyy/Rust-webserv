@@ -1,8 +1,13 @@
-use std::{collections::HashMap, io, net::IpAddr};
+use std::{
+    collections::HashMap,
+    fmt::format,
+    io::{self, SeekFrom},
+    net::IpAddr,
+};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
+    net::{unix::SocketAddr, TcpListener, TcpStream},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -24,38 +29,17 @@ pub struct Listener {
 impl Listener {
     pub async fn init_listeners(
         addr: IpAddr,
-        servers: Vec<Server>,
+        servers: HashMap<u16, Vec<Server>>,
         cancel_token: &CancellationToken,
     ) -> io::Result<Vec<Self>> {
-        let mut listeners: HashMap<u16, Self> = HashMap::new();
+        let mut listeners: Vec<Self> = Vec::new();
 
-        for serv in servers {
-            if serv.port().is_none() {
-                eprintln!("Warning: a server don't have port to listen on, he will be ignored");
-                continue;
-            }
-
-            let port = serv.port().unwrap();
-
-            if listeners.contains_key(port) {
-                let vec = listeners.get_mut(port).unwrap();
-                let listener_servs: &mut Vec<Server> = vec.servers.as_mut();
-                listener_servs.push(serv);
-            } else {
-                listeners.insert(
-                    port.to_owned(),
-                    Self::new(
-                        addr.clone(),
-                        port.to_owned(),
-                        vec![serv],
-                        cancel_token.clone(),
-                    )
-                    .await?,
-                );
-            }
+        for (port, vec) in servers {
+            let listener = Self::new(addr, port, vec, cancel_token.clone()).await?;
+            listeners.push(listener);
         }
 
-        Ok(listeners.into_values().collect())
+        Ok(listeners)
     }
 
     pub async fn new(
@@ -79,6 +63,10 @@ impl Listener {
     }
 
     pub async fn listen(self) -> io::Result<()> {
+        println!(
+            "------[listener ({}): start listening]------",
+            self.listener.local_addr().unwrap()
+        );
         loop {
             let cancel = self.cancel_token.clone();
             tokio::select! {
@@ -87,11 +75,11 @@ impl Listener {
                     let server_instance = self.servers.clone();
                     tokio::spawn( async move {
                         let _ = Self::handle_stream(stream, &server_instance).await;
-                        eprintln!("------[ End of Stream ]------");
+                        // eprintln!("------[ End of Stream ]------");
                     });
                 }
                 _ = cancel.cancelled() => {
-                    println!("------[listener ({:#?}): stop listening]------", self.listener.local_addr().unwrap());
+                    println!("------[listener ({}): stop listening]------", self.listener.local_addr().unwrap());
                     return Ok(());
                 }
             }
@@ -99,7 +87,7 @@ impl Listener {
     }
 
     async fn handle_stream(mut stream: TcpStream, servers: &Vec<Server>) -> anyhow::Result<()> {
-		let mut raw = String::new();
+        let mut raw = String::new();
         let mut buffer = [0; 65536];
 
         loop {
@@ -111,7 +99,7 @@ impl Listener {
                 Ok(n) => n,
             };
 
-            raw.push_str(std::str::from_utf8(&buffer[..n])?);
+            raw.push_str(&String::from_utf8_lossy(&buffer[..n]));
 
             while let Some((header, raw_left)) = raw.split_once("\r\n\r\n") {
                 eprintln!("\n\n\n----[ Incoming request ]----");
@@ -164,7 +152,7 @@ impl Listener {
     fn choose_server_from<'a>(request: &Request, servers: &'a Vec<Server>) -> &'a Server {
         let mut default = None;
 
-		eprintln!("request:\n{request:#?}");
+        // eprintln!("request:\n{request:#?}");
 
         if request.host().is_some() {
             let hostname = request.host().unwrap();
