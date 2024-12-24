@@ -99,8 +99,8 @@ impl Listener {
     }
 
     async fn handle_stream(mut stream: TcpStream, servers: &Vec<Server>) -> anyhow::Result<()> {
+		let mut raw = String::new();
         let mut buffer = [0; 65536];
-        let mut raw = String::new();
 
         loop {
             let n = match stream.read(&mut buffer).await {

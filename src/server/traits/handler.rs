@@ -5,6 +5,7 @@ use std::{
     process::{Output, Stdio},
 };
 
+use nom::{AsBytes, FindSubstring, FindToken};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
@@ -23,6 +24,11 @@ use super::config::{
     Config,
 };
 
+pub struct MultipartFile {
+	filename: String,
+	content_type: Option<String>,
+}
+
 pub trait Handler: Config {
     async fn handle_request(
         &self,
@@ -30,7 +36,7 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         raw_left: &mut str,
     ) -> Option<String> {
-		eprintln!("Request: {request:#?}");
+		// eprintln!("Request: {request:#?}");
         match self.parse_request(&mut request) {
             Ok(location) => location,
             Err(err) => {
@@ -177,12 +183,12 @@ pub trait Handler: Config {
     ) -> Result<String, io::Error> {
         eprintln!("uploading file");
 
-        if self.upload_folder().is_none() {
-            eprintln!("no upload folder");
-            return Err(io::Error::new(ErrorKind::NotFound, "No upload folder"));
-        } else if request.content_length().is_none() {
+        if request.content_length().is_none() {
             eprintln!("No content length -> No upload");
             return Ok(raw_left.to_owned());
+        } else if self.upload_folder().is_none() {
+            eprintln!("no upload folder");
+            return Err(io::Error::new(ErrorKind::NotFound, "No upload folder"));
         }
 
         let upload_folder = self.upload_folder().unwrap();
@@ -232,59 +238,182 @@ pub trait Handler: Config {
         };
         eprintln!("boundary: {boundary}");
 
-        self.upload_default_content(request, stream, raw_left, upload_folder).await
+        Self::upload_multipart_content(stream, request.content_length().unwrap().clone(), raw_left, boundary, upload_folder).await
     }
 
-	async fn upload_multipart_content(stream: &mut TcpStream, length_missing: usize, raw_left: &str, boundary: String) -> io::Result<(String, String)> {
-		if let Some((header, left)) = raw_left.split_once("\r\n\r\n") { return Ok((header.to_owned(), left.to_owned())) }
-		
-		let readed = 0;
-		let raw = raw_left.to_owned();
-		let mut buffer = String::new();
-		let mut n;
+	async fn upload_multipart_content(stream: &mut TcpStream, content_len: usize, raw_left: &str, boundary: String, upload_folder: &PathBuf) -> io::Result<String> {
+		let mut readed = 0;
 
-		while readed < length_missing {
-			raw = Self::read_at_least(boundary.len() + 2, stream, &raw).await?;
-			if raw.starts_with(boundary) == false {
+		let mut raw_left = raw_left.to_owned();
+
+		while readed < content_len {
+			let index;
+			(raw_left, index) = Self::read_until_find(
+				&boundary,
+				content_len - readed,
+				&raw_left,
+				stream
+			).await?;
+
+			if index != Some(0) {
 				return Err(io::Error::new(ErrorKind::InvalidData, "expected boundary"))
 			}
 
-			raw.
+			let mut temp = &raw_left[boundary.len()..];
+			readed += boundary.len();
 
+			if temp.starts_with("--") {
+				return Ok(temp[4..].to_owned())
+			} if temp.starts_with("\r\n") {
+				temp = &temp[2..];
+				readed += 2;
+			} else {
+				return Err(io::Error::new(ErrorKind::InvalidData, "invalid boundary"))
+			}
 
-			// read header
-			// read body
+			let file;
+			let read;
+			(file, raw_left, read) = Self::deserialize_multipart_header(
+				content_len - readed,
+				stream,
+				temp
+			).await?;
+			
+			readed += read;
 
-		}
-	}
-
-	async fn read_at_least(to_read: usize, stream: &mut TcpStream, raw_left: &str) -> io::Result<String> {
-		if raw_left.len() >= to_read { return Ok(raw_left.to_string()) }
-
-		let mut buffer = [0; 65536];
-		let mut readed = raw_left.len();
-		let mut raw_left = raw_left.to_owned();
-
-		while readed < to_read {
-			let n = stream.read(&mut buffer).await?;
-
-			readed += n;
-			raw_left.push_str(&String::from_utf8_lossy(buffer.as_slice()));
+			let read;
+			(raw_left, read) = if file.is_none() { continue }
+			else {
+				Self::create_and_upload(
+					file.unwrap(),
+					raw_left,
+					stream,
+					upload_folder,
+					&boundary
+				).await?
+			};
+			readed += read;
 		}
 
 		Ok(raw_left)
 	}
 
+	async fn create_and_upload(file: MultipartFile, raw_left: String, stream: &mut TcpStream, upload_folder: &PathBuf, boundary: &str) -> io::Result<(String, usize)> {
+		let mut file = OpenOptions::new()
+			.write(true)
+			.read(true)
+			.create(true)
+			.truncate(true)
+			.open(PathBuf::from(format!(
+				"{}/{}",
+				upload_folder.to_string_lossy().to_string(),
+				file.filename
+			))).await?;
+			
+		if let Some(index) = raw_left.find(boundary) {
+			file.write_all(raw_left[..index - 2].as_bytes()).await?;
+			return Ok((raw_left[index..].to_string().to_string(), index))
+		}
+
+		let boundary = boundary.as_bytes();
+		let raw_left = raw_left.as_bytes();
+		let mut readed = 0;
+		
+
+		loop {
+			let mut buffer = [0; 65536];
+
+			let n = stream.read(&mut buffer).await?;
+			
+			let mut raw_left = raw_left.to_vec();
+			raw_left.append(&mut buffer[..n].to_vec());
+			let raw_left = raw_left.as_bytes();
+			
+			if let Some(index) = raw_left.find_substring(boundary) {
+				file.write_all(&raw_left[..index - 2]).await?;
+				readed += index;
+				return Ok((String::from_utf8_lossy(&raw_left[index..]).to_string(), readed))
+			}
+
+			let security = if raw_left.len() > boundary.len() {raw_left.len() - boundary.len()} else { 0 };
+			file.write_all(&raw_left[..security]).await?;
+			readed += security;
+		}
+		
+	}
+
     async fn deserialize_multipart_header(
-        &self,
-        request: &Request,
+		read_limit: usize,
         stream: &mut TcpStream,
         raw_left: &str,
-        upload_folder: &PathBuf,
-        boundary: String,
-    ) {
-        loop {}
+    ) -> io::Result<(Option<MultipartFile>, String, usize)> {
+        let (raw_left, index) = Self::read_until_find(&"\r\n\r\n".to_owned(), read_limit, raw_left, stream).await?;
+
+		let (headers, raw_left) = match index {
+			Some(index) => {
+				(raw_left[..index + 2].to_string(), raw_left[index + 4..].to_string())
+			}
+			None => {
+				return Err(io::Error::new(ErrorKind::InvalidData, "invalid multipart content"))
+			}
+		};
+
+		let mut content_type = None;
+		let mut content_disposition = None;
+
+		for header in headers.split("\r\n") {
+			if header.starts_with("Content-Type: ") {
+				content_type = Some(header["Content-Type: ".len()..].to_string());
+			} else if header.starts_with("Content-Disposition") {
+				content_disposition = Some(header["Content-Disposition".len()..].to_string());
+			}
+		}
+
+		let readed = headers.len();
+
+		if content_disposition.is_none() { return Ok((None, raw_left, readed)) }
+		let content_disposition = content_disposition.unwrap();
+
+		let filename_index = content_disposition.find("filename=");
+		if filename_index.is_none() { return Ok((None, raw_left, readed)) }
+		let filename_index = filename_index.unwrap() + "filename=".len();
+
+		let filename = &content_disposition[filename_index..];
+
+		if filename.starts_with("\"") == false || filename.ends_with("\"") == false {
+			return Err(io::Error::new(ErrorKind::InvalidData, "invalid filename"))
+		}
+
+		let filename = filename[1..filename.len() - 1].to_string();
+
+		return Ok((Some(MultipartFile{filename, content_type}), raw_left, readed))
+
     }
+
+	async fn read_until_find(to_find: &str, read_limit: usize, raw_left: &str, stream: &mut TcpStream) -> io::Result<(String, Option<usize>)> {
+		if let Some(index) = raw_left.find(to_find) { return Ok((raw_left.to_owned(), Some(index))) }
+
+		let mut buffer = [0; 65536];
+		let mut readed = 0;
+		let mut raw_left = raw_left.to_owned();
+
+		while readed < read_limit {
+			let n = stream.read(&mut buffer).await?;
+			readed += n;
+
+			let start_point =
+			if raw_left.len() < to_find.len() { 0 }
+			else { raw_left.len() - to_find.len() };
+
+			raw_left.push_str(&String::from_utf8_lossy(buffer.as_slice()));
+
+			if let Some(index) =  raw_left[start_point..].find(to_find) {
+				return Ok((raw_left, Some(index)));
+			} else if readed > read_limit { return Ok((raw_left, None)) }
+		}
+
+		Ok((raw_left, None))
+	}
 
     /*------------------------------------------------------------*/
     /*-------------------[ Default Upload ]-----------------------*/

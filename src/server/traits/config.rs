@@ -193,9 +193,7 @@ pub trait Config {
 #[allow(dead_code)]
 pub mod utils {
     use std::{
-        io::{self, ErrorKind},
-        path::PathBuf,
-        usize,
+        fmt::format, io::{self, ErrorKind}, path::PathBuf, usize
     };
 
     use tokio::{
@@ -438,7 +436,7 @@ pub mod utils {
         let mut boundary = content_type[boundary_pos..].split_whitespace();
         let boundary = boundary.nth(0)?;
 
-        return Some(boundary.to_string());
+        return Some(format!("--{boundary}"));
     }
 
     pub async fn consume_body(
