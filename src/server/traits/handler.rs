@@ -34,8 +34,8 @@ pub trait Handler: Config {
         &self,
         mut request: Request,
         stream: &mut TcpStream,
-        raw_left: &mut str,
-    ) -> Option<String> {
+        raw_left: &mut [u8],
+    ) -> Option<Vec<u8>> {
         // eprintln!("Request: {request:#?}");
         match self.parse_request(&mut request) {
             Ok(location) => location,
@@ -43,7 +43,7 @@ pub trait Handler: Config {
                 eprintln!("Error: parsing request: {}", err.to_string());
                 send_error_response(stream, err).await;
                 return if request.keep_connection_alive() == true {
-                    Some(raw_left.to_string())
+                    Some(raw_left.to_vec())
                 } else {
                     None
                 };
@@ -63,8 +63,8 @@ pub trait Handler: Config {
         &self,
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &mut str,
-    ) -> Option<String> {
+        raw_left: &mut [u8],
+    ) -> Option<Vec<u8>> {
         let raw_left = match self.handle_body_request(&request, stream, raw_left).await {
             Ok(raw_left) => raw_left,
             Err(err) => {
@@ -76,7 +76,7 @@ pub trait Handler: Config {
                         send_error_response(stream, ResponseCode::from_error(&err)).await;
 
                         if request.keep_connection_alive() == true {
-                            return Some(raw_left.to_string()); // keep stream alive
+                            return Some(raw_left.to_vec()); // keep stream alive
                         } else {
                             return None; // kill stream
                         };
@@ -107,8 +107,8 @@ pub trait Handler: Config {
         &self,
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &mut str,
-    ) -> Option<String> {
+        raw_left: &mut [u8],
+    ) -> Option<Vec<u8>> {
         eprintln!("executing CGI");
 
         let (output, raw_left) = match self.execute_cgi(request, stream, raw_left).await {
@@ -159,10 +159,10 @@ pub trait Handler: Config {
         &self,
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &mut str,
-    ) -> Result<String, io::Error> {
+        raw_left: &mut [u8],
+    ) -> Result<Vec<u8>, io::Error> {
         if request.content_length().is_none() {
-            return Ok(raw_left.to_string());
+            return Ok(raw_left.to_vec());
         }
 
         match request.method() {
@@ -179,13 +179,13 @@ pub trait Handler: Config {
         &self,
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &str,
-    ) -> Result<String, io::Error> {
+        raw_left: &[u8],
+    ) -> Result<Vec<u8>, io::Error> {
         eprintln!("uploading file");
 
         if request.content_length().is_none() {
             eprintln!("No content length -> No upload");
-            return Ok(raw_left.to_owned());
+            return Ok(raw_left.to_vec());
         } else if self.upload_folder().is_none() {
             eprintln!("no upload folder");
             return Err(io::Error::new(ErrorKind::NotFound, "No upload folder"));
@@ -224,9 +224,9 @@ pub trait Handler: Config {
         &self,
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &str,
+        raw_left: &[u8],
         upload_folder: &PathBuf,
-    ) -> Result<String, io::Error> {
+    ) -> Result<Vec<u8>, io::Error> {
         let boundary = match utils::extract_boundary(request.content_type()) {
             Some(boundary) => boundary,
             None => {
@@ -251,10 +251,10 @@ pub trait Handler: Config {
     async fn upload_multipart_content(
         stream: &mut TcpStream,
         content_len: usize,
-        raw_left: &str,
+        raw_left: &[u8],
         boundary: String,
         upload_folder: &PathBuf,
-    ) -> io::Result<String> {
+    ) -> io::Result<Vec<u8>> {
         let mut readed = 0;
 
         let mut raw_left = raw_left.to_owned();
@@ -262,19 +262,19 @@ pub trait Handler: Config {
         while readed < content_len {
             let index;
             (raw_left, index) =
-                Self::read_until_find(&boundary, content_len - readed, &raw_left, stream).await?;
+                Self::read_until_find(boundary.as_bytes(), content_len - readed, &raw_left, stream).await?;
 
             if index != Some(0) {
                 return Err(io::Error::new(ErrorKind::InvalidData, "expected boundary"));
             }
 
-            let mut temp = &raw_left[boundary.len()..];
+            let temp = String::from_utf8_lossy(&raw_left[boundary.len()..boundary.len()+4]);
             readed += boundary.len();
 
-            if temp.starts_with("--") {
+            if temp.starts_with("--\r\n") {
                 readed += 4;
                 if readed == content_len {
-                    return Ok(temp[4..].to_owned());
+                    return Ok(raw_left[boundary.len() + 4..].to_vec());
                 } else {
                     return Err(io::Error::new(
                         ErrorKind::InvalidData,
@@ -282,12 +282,13 @@ pub trait Handler: Config {
                     ));
                 }
             }
-            if temp.starts_with("\r\n") {
-                temp = &temp[2..];
+
+            let temp = if temp.starts_with("\r\n") {
                 readed += 2;
+                temp[2..].as_bytes()
             } else {
                 return Err(io::Error::new(ErrorKind::InvalidData, "invalid boundary"));
-            }
+            };
 
             let file;
             let read;
@@ -298,7 +299,7 @@ pub trait Handler: Config {
 
             let read;
             (raw_left, read) =
-                Self::create_and_upload(file, raw_left, stream, upload_folder, &boundary).await?;
+                Self::create_and_upload(file, raw_left, stream, upload_folder, boundary.as_bytes()).await?;
             readed += read;
         }
 
@@ -307,11 +308,11 @@ pub trait Handler: Config {
 
     async fn create_and_upload(
         file: MultipartFile,
-        raw_left: String,
+        raw_left: Vec<u8>,
         stream: &mut TcpStream,
         upload_folder: &PathBuf,
-        boundary: &str,
-    ) -> io::Result<(String, usize)> {
+        boundary: &[u8],
+    ) -> io::Result<(Vec<u8>, usize)> {
         let mut file = OpenOptions::new()
             .write(true)
             .read(true)
@@ -324,9 +325,9 @@ pub trait Handler: Config {
             )))
             .await?;
 
-        if let Some(index) = raw_left.find(boundary) {
+        if let Some(index) = utils::find_in(&raw_left, boundary) {
             file.write_all(raw_left[..index - 2].as_bytes()).await?;
-            return Ok((raw_left[index..].to_string(), index));
+            return Ok((raw_left[index..].to_vec(), index));
         }
 
         let boundary = boundary.as_bytes();
@@ -347,7 +348,7 @@ pub trait Handler: Config {
                 file.write_all(&raw_left[..index - 2]).await?;
                 readed += index;
                 return Ok((
-                    String::from_utf8_lossy(&raw_left[index..]).to_string(),
+                    raw_left[index..].to_vec(),
                     readed,
                 ));
             }
@@ -366,18 +367,18 @@ pub trait Handler: Config {
     async fn deserialize_multipart_header(
         read_limit: usize,
         stream: &mut TcpStream,
-        raw_left: &str,
-    ) -> io::Result<(MultipartFile, String, usize)> {
+        raw_left: &[u8],
+    ) -> io::Result<(MultipartFile, Vec<u8>, usize)> {
         let readed;
 
         let (raw_left, index) =
-            Self::read_until_find(&"\r\n\r\n".to_owned(), read_limit, raw_left, stream).await?;
+            Self::read_until_find(b"\r\n\r\n", read_limit, raw_left, stream).await?;
         let (headers, raw_left) = match index {
             Some(index) => {
                 readed = index + 4;
                 (
-                    raw_left[..index + 2].to_string(),
-                    raw_left[index + 4..].to_string(),
+                    String::from_utf8_lossy(&raw_left[..index + 2]),
+                    raw_left[index + 4..].to_vec(),
                 )
             }
             None => {
@@ -436,12 +437,12 @@ pub trait Handler: Config {
     }
 
     async fn read_until_find(
-        to_find: &str,
+        to_find: &[u8],
         read_limit: usize,
-        raw_left: &str,
+        raw_left: &[u8],
         stream: &mut TcpStream,
-    ) -> io::Result<(String, Option<usize>)> {
-        if let Some(index) = raw_left.find(to_find) {
+    ) -> io::Result<(Vec<u8>, Option<usize>)> {
+        if let Some(index) = utils::find_in(raw_left, to_find) {
             return Ok((raw_left.to_owned(), Some(index)));
         }
 
@@ -459,9 +460,9 @@ pub trait Handler: Config {
                 raw_left.len() - to_find.len()
             };
 
-            raw_left.push_str(&String::from_utf8_lossy(buffer.as_slice()));
+            raw_left.extend_from_slice(&buffer[..n]);
 
-            if let Some(index) = raw_left[start_point..].find(to_find) {
+            if let Some(index) = utils::find_in(&raw_left[start_point..], to_find) {
                 return Ok((raw_left, Some(index)));
             } else if readed > read_limit {
                 return Ok((raw_left, None));
@@ -479,9 +480,9 @@ pub trait Handler: Config {
         &self,
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &str,
+        raw_left: &[u8],
         upload_folder: &PathBuf,
-    ) -> Result<String, io::Error> {
+    ) -> Result<Vec<u8>, io::Error> {
         let file = format!("{}/test", upload_folder.to_str().unwrap());
 
         let mut file = match OpenOptions::new()
@@ -496,8 +497,7 @@ pub trait Handler: Config {
             Err(err) => return Err(err),
         };
 
-        self.default_upload(&mut file, stream, request, raw_left)
-            .await
+        self.default_upload(&mut file, stream, request, raw_left).await
     }
 
     async fn default_upload(
@@ -505,8 +505,8 @@ pub trait Handler: Config {
         file: &mut File,
         stream: &mut TcpStream,
         request: &Request,
-        raw_left: &str,
-    ) -> Result<String, io::Error> {
+        raw_left: &[u8],
+    ) -> Result<Vec<u8>, io::Error> {
         let mut buffer = [0; 65536];
         let mut read = 0;
         let mut n = 0;
@@ -514,7 +514,7 @@ pub trait Handler: Config {
 
         if body_len <= raw_left.len() {
             file.write(&raw_left.as_bytes()[..body_len]).await?;
-            return Ok(raw_left[body_len..].to_string());
+            return Ok(raw_left[body_len..].to_vec());
         } else {
             file.write(raw_left.as_bytes()).await?;
             read += raw_left.len();
@@ -537,7 +537,7 @@ pub trait Handler: Config {
 
         let end = n - (read - body_len);
 
-        return Ok(String::from_utf8_lossy(&buffer[end..]).to_string());
+        return Ok(buffer[end..].to_vec());
     }
 
     /*------------------------------------------------------------*/
@@ -626,8 +626,8 @@ pub trait Handler: Config {
         &self,
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &mut str,
-    ) -> Result<(Output, String), io::Error> {
+        raw_left: &mut [u8],
+    ) -> Result<(Output, Vec<u8>), io::Error> {
         // execute cgi :
         //		- check program path
         //		- execute path with Command::new() (set envs)

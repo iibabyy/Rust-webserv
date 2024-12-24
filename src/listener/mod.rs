@@ -16,7 +16,7 @@ use crate::{
     response::response::{Response, ResponseCode},
     server::{
         server::Server,
-        traits::{config::Config, handler::Handler},
+        traits::{config::{utils, Config}, handler::Handler},
     },
 };
 
@@ -87,7 +87,7 @@ impl Listener {
     }
 
     async fn handle_stream(mut stream: TcpStream, servers: &Vec<Server>) -> anyhow::Result<()> {
-        let mut raw = String::new();
+        let mut raw = Vec::new();
         let mut buffer = [0; 65536];
 
         loop {
@@ -99,9 +99,11 @@ impl Listener {
                 Ok(n) => n,
             };
 
-            raw.push_str(&String::from_utf8_lossy(&buffer[..n]));
+            raw.extend_from_slice(&buffer[..n]);
 
-            while let Some((header, raw_left)) = raw.split_once("\r\n\r\n") {
+            while let Some(delim) = utils::find_in(raw.as_slice(), b"\r\n\r\n") {
+				let header = &raw[..delim + 2];
+				let raw_left = &raw[delim + 4..];
                 eprintln!("\n\n\n----[ Incoming request ]----");
                 raw = match Self::handle_request(
                     header,
@@ -123,17 +125,17 @@ impl Listener {
     }
 
     async fn handle_request(
-        header: &str,
+        header: &[u8],
         stream: &mut TcpStream,
         servers: &Vec<Server>,
-        raw_left: &mut str,
-    ) -> Option<String> {
+        raw_left: &mut [u8],
+    ) -> Option<Vec<u8>> {
         let request = match Request::try_from(header) {
             Ok(request) => request,
             Err(err) => {
                 eprintln!("Error: deserializing header: {}", err.to_string());
                 send_error_response(stream, err).await;
-                return Some(raw_left.to_string());
+                return Some(raw_left.to_vec());
                 // send error response bad request
             }
         };

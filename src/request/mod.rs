@@ -73,9 +73,10 @@ impl Default for Request {
     }
 }
 
-impl TryFrom<&str> for Request {
+impl TryFrom<&[u8]> for Request {
     type Error = ResponseCode;
-    fn try_from(value: &str) -> Result<Request, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Request, Self::Error> {
+		let value = String::from_utf8_lossy(value);
         let headers = value.split("\r\n").map(|str| str.to_string()).collect();
         match Self::deserialize(headers) {
             Ok(request) => Ok(request),

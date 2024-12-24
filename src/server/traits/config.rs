@@ -364,21 +364,17 @@ pub mod utils {
         request: &Request,
         stream: &mut TcpStream,
         child: &mut Child,
-        raw_left: &mut str,
-    ) -> Result<String, io::Error> {
+        raw_left: &mut [u8],
+    ) -> Result<Vec<u8>, io::Error> {
         if let Some(mut stdin) = child.stdin.take() {
             if request.content_length().is_none() {
-                return Ok(raw_left.to_owned());
+                return Ok(raw_left.to_vec());
             }
 
             let content_len = request.content_length().unwrap().to_owned();
 
             if raw_left.len() >= content_len {
-                unsafe {
-                    stdin
-                        .write_all(raw_left[..content_len].as_bytes_mut())
-                        .await?;
-                }
+				stdin.write_all(&raw_left[..content_len]).await?;
 
                 return Ok(raw_left[content_len..].to_owned());
             }
@@ -389,9 +385,7 @@ pub mod utils {
             let mut n = 0;
 
             {
-                unsafe {
-                    stdin.write_all(raw_left.as_bytes_mut()).await?;
-                }
+				stdin.write_all(raw_left).await?;
 
                 while read < length_missing {
                     n = match stream.read(&mut buffer).await {
@@ -410,7 +404,7 @@ pub mod utils {
             let end = n - read_too_much;
 
             stdin.write_all(&buffer[..end]).await?;
-            return Ok(String::from_utf8_lossy(&buffer[end..end + read_too_much]).to_string());
+            return Ok(buffer[end..end + read_too_much].to_vec());
         } else {
             return Err(io::Error::new(
                 ErrorKind::BrokenPipe,
@@ -445,27 +439,25 @@ pub mod utils {
     pub async fn consume_body(
         request: &Request,
         stream: &mut TcpStream,
-        raw_left: &mut str,
-    ) -> Result<String, io::Error> {
+        raw_left: &mut [u8],
+    ) -> Result<Vec<u8>, io::Error> {
         let content_length = request.content_length().unwrap().to_owned() as usize;
 
         if raw_left.len() >= content_length {
-            return Ok(raw_left[content_length..].to_string());
+            return Ok(raw_left[content_length..].to_vec());
         }
 
-        unsafe {
-            stream.read_exact(raw_left.as_bytes_mut()).await?;
-        }
+		stream.read_exact(raw_left).await?;
 
         let length_missing = content_length - raw_left.len();
 
         match consume_stream(stream, length_missing).await {
-            Ok(str) => Ok(str),
+            Ok(left) => Ok(left),
             Err(err) => Err(err),
         }
     }
 
-    async fn consume_stream(stream: &mut TcpStream, len: usize) -> io::Result<String> {
+    async fn consume_stream(stream: &mut TcpStream, len: usize) -> io::Result<Vec<u8>> {
         let mut buffer = [0; 65536];
         let mut read = 0;
         let mut n = 0;
@@ -481,7 +473,7 @@ pub mod utils {
         let read_too_much = read - len;
         let end = n - read_too_much;
 
-        return Ok(String::from_utf8_lossy(&buffer[end..end + read_too_much]).to_string());
+        return Ok(buffer[end..end + read_too_much].to_vec());
     }
 
     pub enum UploadType {
@@ -504,4 +496,9 @@ pub mod utils {
             return UploadType::Normal;
         }
     }
+
+	pub fn find_in<T: PartialEq>(big: &[T], little: &[T]) -> Option<usize> {
+		big.windows(little.len()).position(|window| window == little)
+	}
+
 }
