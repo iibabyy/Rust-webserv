@@ -29,14 +29,18 @@ impl Response {
     /*----------------[ Sending ]----------------*/
     /*-------------------------------------------*/
 
-    pub async fn send(&mut self, stream: &mut TcpStream) -> io::Result<()> {
+    pub async fn send(
+        &mut self,
+        stream: &mut TcpStream,
+        buffer: &mut [u8; 65536],
+    ) -> io::Result<()> {
         match self.send_header(stream).await {
             Ok(_) => (),
             Err(None) => return Ok(()), // end of stream
             Err(Some(err)) => return Err(err),
         }
 
-        self.send_body(stream).await?;
+        self.send_body(stream, buffer).await?;
 
         Ok(())
     }
@@ -57,12 +61,14 @@ impl Response {
         Ok(())
     }
 
-    async fn send_body(&mut self, stream: &mut TcpStream) -> io::Result<()> {
+    async fn send_body(
+        &mut self,
+        stream: &mut TcpStream,
+        buffer: &mut [u8; 65536],
+    ) -> io::Result<()> {
         if self.file.is_some() {
-            let mut buffer = [0; 65536];
-
             loop {
-                let n = self.file.as_mut().unwrap().read(&mut buffer).await?;
+                let n = self.file.as_mut().unwrap().read(buffer).await?;
                 if n == 0 {
                     break;
                 }

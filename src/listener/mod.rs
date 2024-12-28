@@ -16,7 +16,10 @@ use crate::{
     response::response::{Response, ResponseCode},
     server::{
         server::Server,
-        traits::{config::{utils, Config}, handler::Handler},
+        traits::{
+            config::{utils, Config},
+            handler::Handler,
+        },
     },
 };
 
@@ -102,14 +105,15 @@ impl Listener {
             raw.extend_from_slice(&buffer[..n]);
 
             while let Some(delim) = utils::find_in(raw.as_slice(), b"\r\n\r\n") {
-				let header = &raw[..delim + 2];
-				let raw_left = &raw[delim + 4..];
+                let header = &raw[..delim + 2];
+                let raw_left = &raw[delim + 4..];
                 eprintln!("\n\n\n----[ Incoming request ]----");
                 raw = match Self::handle_request(
                     header,
                     &mut stream,
                     servers,
                     &mut raw_left.to_owned(),
+                    &mut buffer,
                 )
                 .await
                 {
@@ -129,12 +133,13 @@ impl Listener {
         stream: &mut TcpStream,
         servers: &Vec<Server>,
         raw_left: &mut [u8],
+        buffer: &mut [u8; 65536],
     ) -> Option<Vec<u8>> {
         let request = match Request::try_from(header) {
             Ok(request) => request,
             Err(err) => {
                 eprintln!("Error: deserializing header: {}", err.to_string());
-                send_error_response(stream, err).await;
+                send_error_response(stream, err, buffer).await;
                 return Some(raw_left.to_vec());
                 // send error response bad request
             }
@@ -143,9 +148,13 @@ impl Listener {
         let server = Self::choose_server_from(&request, servers);
 
         let raw_left = if let Some(location) = server.get_request_location(&request) {
-            location.handle_request(request, stream, raw_left).await
+            location
+                .handle_request(request, stream, raw_left, buffer)
+                .await
         } else {
-            server.handle_request(request, stream, raw_left).await
+            server
+                .handle_request(request, stream, raw_left, buffer)
+                .await
         };
 
         return raw_left;
@@ -182,8 +191,12 @@ impl Listener {
     }
 }
 
-pub async fn send_error_response(stream: &mut TcpStream, code: ResponseCode) {
+pub async fn send_error_response(
+    stream: &mut TcpStream,
+    code: ResponseCode,
+    buffer: &mut [u8; 65536],
+) {
     let mut response = Response::new(code);
 
-    let _ = response.send(stream).await;
+    let _ = response.send(stream, buffer).await;
 }

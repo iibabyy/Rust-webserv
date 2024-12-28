@@ -365,6 +365,7 @@ pub mod utils {
         stream: &mut TcpStream,
         child: &mut Child,
         raw_left: &mut [u8],
+        buffer: &mut [u8; 65536],
     ) -> Result<Vec<u8>, io::Error> {
         if let Some(mut stdin) = child.stdin.take() {
             if request.content_length().is_none() {
@@ -374,28 +375,27 @@ pub mod utils {
             let content_len = request.content_length().unwrap().to_owned();
 
             if raw_left.len() >= content_len {
-				stdin.write_all(&raw_left[..content_len]).await?;
+                stdin.write_all(&raw_left[..content_len]).await?;
 
                 return Ok(raw_left[content_len..].to_owned());
             }
 
             let length_missing = content_len - raw_left.len();
-            let mut buffer = [0; 65536];
             let mut read = 0;
             let mut n = 0;
 
             {
-				stdin.write_all(raw_left).await?;
+                stdin.write_all(raw_left).await?;
 
                 while read < length_missing {
-                    n = match stream.read(&mut buffer).await {
+                    n = match stream.read(buffer).await {
                         Ok(n) => n,
                         Err(err) => return Err(err),
                     };
                     read += n;
 
                     if read < length_missing {
-                        stdin.write_all(&mut buffer).await?;
+                        stdin.write_all(buffer).await?;
                     }
                 }
             }
@@ -440,6 +440,7 @@ pub mod utils {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &mut [u8],
+        buffer: &mut [u8; 65536],
     ) -> Result<Vec<u8>, io::Error> {
         let content_length = request.content_length().unwrap().to_owned() as usize;
 
@@ -447,22 +448,25 @@ pub mod utils {
             return Ok(raw_left[content_length..].to_vec());
         }
 
-		stream.read_exact(raw_left).await?;
+        stream.read_exact(raw_left).await?;
 
         let length_missing = content_length - raw_left.len();
 
-        match consume_stream(stream, length_missing).await {
+        match consume_stream(stream, length_missing, buffer).await {
             Ok(left) => Ok(left),
             Err(err) => Err(err),
         }
     }
 
-    async fn consume_stream(stream: &mut TcpStream, len: usize) -> io::Result<Vec<u8>> {
-        let mut buffer = [0; 65536];
+    async fn consume_stream(
+        stream: &mut TcpStream,
+        len: usize,
+        buffer: &mut [u8; 65536],
+    ) -> io::Result<Vec<u8>> {
         let mut read = 0;
         let mut n = 0;
         while read < len {
-            n = match stream.read(&mut buffer).await {
+            n = match stream.read(buffer).await {
                 Ok(n) => n,
                 Err(err) => return Err(err),
             };
@@ -497,8 +501,8 @@ pub mod utils {
         }
     }
 
-	pub fn find_in<T: PartialEq>(big: &[T], little: &[T]) -> Option<usize> {
-		big.windows(little.len()).position(|window| window == little)
-	}
-
+    pub fn find_in<T: PartialEq>(big: &[T], little: &[T]) -> Option<usize> {
+        big.windows(little.len())
+            .position(|window| window == little)
+    }
 }

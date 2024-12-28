@@ -42,12 +42,12 @@ pub mod parsing {
 
         let path = PathBuf::from(&value[0]);
 
-		if path.exists() == false {
-			match std::fs::create_dir_all(&path) {
-				Ok(_) => (),
-				Err(err) => { return Err(format!("failed to create upload folder: {err}")) }
-			}
-		} else if path.is_dir() == false {
+        if path.exists() == false {
+            match std::fs::create_dir_all(&path) {
+                Ok(_) => (),
+                Err(err) => return Err(format!("failed to create upload folder: {err}")),
+            }
+        } else if path.is_dir() == false {
             return Err(format!("invalid upload folder: {}", value[0]));
         }
 
