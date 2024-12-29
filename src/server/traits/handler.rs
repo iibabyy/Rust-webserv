@@ -356,7 +356,7 @@ pub trait Handler: Config {
             .await?;
 
         if let Some(index) = utils::find_in(&raw_left, boundary) {
-            file.write_all(raw_left[..index - 2].as_bytes()).await?;
+            file.write_all(&raw_left[..index - 2]).await?;
             return Ok((raw_left[index..].to_vec(), index));
         }
 
@@ -374,8 +374,8 @@ pub trait Handler: Config {
             if let Some(index) = raw_left.find_substring(boundary) {
                 file.write_all(&raw_left[..index - 2])
                     .await?;
-                readed += index + boundary.len() + 2;
-                return Ok((raw_left[index + boundary.len() + 2..].to_vec(), readed));
+                readed += index;
+                return Ok((raw_left[index/* + boundary.len() + 2 */..].to_vec(), readed));
             }
 
             let security = if raw_left.len() > boundary.len() {
@@ -383,6 +383,7 @@ pub trait Handler: Config {
             } else {
                 0
             };
+
             file.write_all(&raw_left[..security]).await?;
             readed += security;
             raw_left = &raw_left[security..];
