@@ -388,9 +388,9 @@ pub mod utils {
                 stdin.write_all(raw_left).await?;
 
                 while read < length_missing {
-                    n = match stream.read(buffer).await {
-                        Ok(n) => n,
-                        Err(err) => return Err(err),
+                    n = match stream.read(buffer).await? {
+						0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
+                        n => n,
                     };
                     read += n;
 
@@ -448,14 +448,11 @@ pub mod utils {
             return Ok(raw_left[content_length..].to_vec());
         }
 
-        stream.read_exact(raw_left).await?;
+        // stream.read_exact(raw_left).await?;
 
         let length_missing = content_length - raw_left.len();
 
-        match consume_stream(stream, length_missing, buffer).await {
-            Ok(left) => Ok(left),
-            Err(err) => Err(err),
-        }
+        consume_stream(stream, length_missing, buffer).await
     }
 
     async fn consume_stream(
@@ -466,9 +463,9 @@ pub mod utils {
         let mut read = 0;
         let mut n = 0;
         while read < len {
-            n = match stream.read(buffer).await {
-                Ok(n) => n,
-                Err(err) => return Err(err),
+            n = match stream.read(buffer).await? {
+				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
+				n => n,
             };
 
             read += n;

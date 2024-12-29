@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::format,
-    io::{self, SeekFrom},
+    io::{self, ErrorKind, SeekFrom},
     net::IpAddr,
 };
 
@@ -94,12 +94,9 @@ impl Listener {
         let mut buffer = [0; 65536];
 
         loop {
-            let n = match stream.read(&mut buffer).await {
-                Err(err) => {
-                    return Ok(eprintln!("Error: {} -> closing conection", err));
-                }
-                Ok(0) => break,
-                Ok(n) => n,
+            let n = match stream.read(&mut buffer).await? {
+                0 => return Ok(()),
+                n => n,
             };
 
             raw.extend_from_slice(&buffer[..n]);
