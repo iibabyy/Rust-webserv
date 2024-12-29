@@ -372,8 +372,7 @@ pub trait Handler: Config {
             raw_left = temp.as_bytes();
 
             if let Some(index) = raw_left.find_substring(boundary) {
-                file.write_all(&raw_left[..index - 2])
-                    .await?;
+                file.write_all(&raw_left[..index - 2]).await?;
                 readed += index;
                 return Ok((raw_left[index/* + boundary.len() + 2 */..].to_vec(), readed));
             }
