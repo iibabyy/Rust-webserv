@@ -5,7 +5,7 @@ use std::{
 };
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncReadExt,
     net::{TcpListener, TcpStream},
 };
 use tokio_util::sync::CancellationToken;
