@@ -1,6 +1,6 @@
 mod config_parsing;
 
-use std::{collections::HashMap, fmt::format, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 use config_parsing::config;
 use tokio::{fs::File, io::AsyncReadExt as _};

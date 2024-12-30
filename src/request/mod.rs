@@ -149,7 +149,7 @@ impl Request {
     // }
 
     fn deserialize(headers: Vec<String>) -> Result<Self, String> {
-        eprintln!("Deserializing header...");
+        // eprintln!("Deserializing header...");
         let mut headers: Iter<'_, String> = headers.iter();
         let first_line = headers.next();
         if first_line.is_none() {

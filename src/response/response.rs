@@ -32,7 +32,7 @@ impl Response {
     pub async fn send(
         &mut self,
         stream: &mut TcpStream,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> io::Result<()> {
         match self.send_header(stream).await {
             Ok(_) => (),
@@ -64,7 +64,7 @@ impl Response {
     async fn send_body(
         &mut self,
         stream: &mut TcpStream,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> io::Result<()> {
         if self.file.is_some() {
             loop {

@@ -57,7 +57,8 @@ fn get_args() -> Result<(Option<String>, bool), String> {
     Ok((config, option_t))
 }
 
-async fn async_main() {
+#[tokio::main]
+async fn main() {
     let (config_file, option_t) = match get_args() {
         Ok(res) => res,
         Err(err) => return eprintln!("{err}"),
@@ -110,13 +111,4 @@ async fn async_main() {
             Ok(_) => {}
         }
     }
-}
-
-fn main() {
-    //TODO: option '-t' for config file check
-    let mut runtime = tokio::runtime::Builder::new_multi_thread();
-
-    runtime.thread_stack_size(1e7 as usize);
-
-    runtime.enable_io().build().unwrap().block_on(async_main())
 }

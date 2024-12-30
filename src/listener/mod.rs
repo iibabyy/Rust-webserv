@@ -1,13 +1,12 @@
 use std::{
     collections::HashMap,
-    fmt::format,
-    io::{self, SeekFrom},
+    io::{self},
     net::IpAddr,
 };
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{unix::SocketAddr, TcpListener, TcpStream},
+    net::{TcpListener, TcpStream},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -74,11 +73,10 @@ impl Listener {
             let cancel = self.cancel_token.clone();
             tokio::select! {
                 Ok((stream, addr)) = self.listener.accept() => {
-                    println!("------[Connection accepted: {addr}]------");
+                    println!("------[Connection incoming: {addr}]------");
                     let server_instance = self.servers.clone();
                     tokio::spawn( async move {
                         let _ = Self::handle_stream(stream, &server_instance).await;
-                        // eprintln!("------[ End of Stream ]------");
                     });
                 }
                 _ = cancel.cancelled() => {
@@ -91,7 +89,7 @@ impl Listener {
 
     async fn handle_stream(mut stream: TcpStream, servers: &Vec<Server>) -> anyhow::Result<()> {
         let mut raw = Vec::new();
-        let mut buffer = [0; 65536];
+        let mut buffer = [0; 8196];
 
         loop {
             let n = match stream.read(&mut buffer).await {
@@ -107,7 +105,6 @@ impl Listener {
             while let Some(delim) = utils::find_in(raw.as_slice(), b"\r\n\r\n") {
                 let header = &raw[..delim + 2];
                 let raw_left = &raw[delim + 4..];
-                eprintln!("\n\n\n----[ Incoming request ]----");
                 raw = match Self::handle_request(
                     header,
                     &mut stream,
@@ -133,7 +130,7 @@ impl Listener {
         stream: &mut TcpStream,
         servers: &Vec<Server>,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
         let request = match Request::try_from(header) {
             Ok(request) => request,
@@ -144,6 +141,12 @@ impl Listener {
                 // send error response bad request
             }
         };
+
+        println!(
+            "[{}] [{}]",
+            request.method().to_string(),
+            request.path().display(),
+        );
 
         let server = Self::choose_server_from(&request, servers);
 
@@ -194,7 +197,7 @@ impl Listener {
 pub async fn send_error_response(
     stream: &mut TcpStream,
     code: ResponseCode,
-    buffer: &mut [u8; 65536],
+    buffer: &mut [u8; 8196],
 ) {
     let mut response = Response::new(code);
 

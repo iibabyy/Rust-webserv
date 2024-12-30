@@ -5,7 +5,7 @@ use std::{
     process::{Output, Stdio},
 };
 
-use nom::{AsBytes, FindSubstring, FindToken};
+use nom::{AsBytes, FindSubstring};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
@@ -24,6 +24,7 @@ use super::config::{
     Config,
 };
 
+#[allow(dead_code)]
 pub struct MultipartFile {
     filename: String,
     content_type: Option<String>,
@@ -35,7 +36,7 @@ pub trait Handler: Config {
         mut request: Request,
         stream: &mut TcpStream,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
         // eprintln!("Request: {request:#?}");
         match self.parse_request(&mut request) {
@@ -66,7 +67,7 @@ pub trait Handler: Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
         let raw_left = match self
             .handle_body_request(&request, stream, raw_left, buffer)
@@ -114,7 +115,7 @@ pub trait Handler: Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
         eprintln!("executing CGI");
 
@@ -167,7 +168,7 @@ pub trait Handler: Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         if request.content_length().is_none() {
             return Ok(raw_left.to_vec());
@@ -188,7 +189,7 @@ pub trait Handler: Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &[u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         eprintln!("uploading file");
 
@@ -235,7 +236,7 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         raw_left: &[u8],
         upload_folder: &PathBuf,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         let boundary = match utils::extract_boundary(request.content_type()) {
             Some(boundary) => boundary,
@@ -264,7 +265,7 @@ pub trait Handler: Config {
         raw_left: &[u8],
         boundary: String,
         upload_folder: &PathBuf,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> io::Result<Vec<u8>> {
         let mut readed = 0;
 
@@ -298,11 +299,8 @@ pub trait Handler: Config {
                         "Invalid Content length",
                     ));
                 }
-            }
-
-            let temp = if temp.starts_with("\r\n") {
+            } else if temp.starts_with("\r\n") {
                 readed += 2;
-                temp[2..].as_bytes()
             } else {
                 return Err(io::Error::new(ErrorKind::InvalidData, "invalid boundary"));
             };
@@ -341,7 +339,7 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         upload_folder: &PathBuf,
         boundary: &[u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> io::Result<(Vec<u8>, usize)> {
         let mut file = OpenOptions::new()
             .write(true)
@@ -393,7 +391,7 @@ pub trait Handler: Config {
         read_limit: usize,
         stream: &mut TcpStream,
         raw_left: &[u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> io::Result<(MultipartFile, Vec<u8>, usize)> {
         let readed;
 
@@ -467,7 +465,7 @@ pub trait Handler: Config {
         read_limit: usize,
         raw_left: &[u8],
         stream: &mut TcpStream,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> io::Result<(Vec<u8>, Option<usize>)> {
         if let Some(index) = utils::find_in(raw_left, to_find) {
             return Ok((raw_left.to_owned(), Some(index)));
@@ -508,7 +506,7 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         raw_left: &[u8],
         upload_folder: &PathBuf,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         let file = format!("{}/test", upload_folder.to_str().unwrap());
 
@@ -534,7 +532,7 @@ pub trait Handler: Config {
         stream: &mut TcpStream,
         request: &Request,
         raw_left: &[u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         let mut read = 0;
         let mut n = 0;
@@ -573,7 +571,7 @@ pub trait Handler: Config {
     /*------------------------------------------------------------*/
 
     async fn build_response(&self, request: &Request) -> Result<Response, io::Error> {
-        eprintln!("Building response...");
+        // eprintln!("Building response...");
         if request.path().is_dir() {
             return utils::build_auto_index(request.path()).await;
         }
@@ -589,7 +587,7 @@ pub trait Handler: Config {
         &self,
         stream: &mut TcpStream,
         request: &Request,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<(), io::Error> {
         let mut response = self.build_response(request).await?;
 
@@ -601,15 +599,9 @@ pub trait Handler: Config {
     /*------------------------------------------------------------*/
 
     async fn build_get_response(&self, request: &Request) -> Result<Response, io::Error> {
-        eprintln!(
-            "Building GET response for '{}'...",
-            request.path().display()
-        );
-        // todo! list files if no auto_index
-
         let file = self.get_GET_request_file(request).await?;
 
-        eprintln!("GET response build...");
+        // eprintln!("GET response build...");
         let mut response = Response::new(ResponseCode::default()).file(file);
 
         response.add_header("Content-Type".to_owned(), "text/html".to_owned());
@@ -619,14 +611,12 @@ pub trait Handler: Config {
 
     #[allow(non_snake_case)]
     async fn get_GET_request_file(&self, request: &Request) -> io::Result<File> {
-        eprintln!("trying to open '{}'...", request.path().display());
+        // eprintln!("trying to open '{}'...", request.path().display());
         if request.path().is_file() {
             match File::open(request.path()).await {
                 Ok(file) => Ok(file),
                 Err(err) => Err(err),
             }
-        } else if request.path().is_dir() {
-            todo!("List directory");
         } else {
             Err(io::Error::new(ErrorKind::NotFound, "file not found"))
         }
@@ -656,7 +646,7 @@ pub trait Handler: Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<(Output, Vec<u8>), io::Error> {
         // execute cgi :
         //		- check program path
