@@ -364,7 +364,10 @@ pub trait Handler: Config {
         let mut temp;
 
         loop {
-            let n = stream.read(buffer).await?;
+            let n = match stream.read(buffer).await? {
+				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "unexpected end of stream")),
+				n => n,
+			};
             temp = raw_left.to_vec();
             temp.append(&mut buffer[..n].to_vec());
             raw_left = temp.as_bytes();
@@ -475,7 +478,11 @@ pub trait Handler: Config {
         let mut raw_left = raw_left.to_owned();
 
         while readed < read_limit {
-            let n = stream.read(buffer).await?;
+            let n = match stream.read(buffer).await? {
+				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "unexpected end of stream")),
+				n => n,
+			};
+
             readed += n;
 
             let start_point = if raw_left.len() < to_find.len() {
@@ -539,18 +546,20 @@ pub trait Handler: Config {
         let body_len = request.content_length().unwrap().clone() as usize;
 
         if body_len <= raw_left.len() {
-            file.write(&raw_left.as_bytes()[..body_len]).await?;
+            file.write(&raw_left[..body_len]).await?;
             return Ok(raw_left[body_len..].to_vec());
         } else {
-            file.write(raw_left.as_bytes()).await?;
+            file.write(raw_left).await?;
             read += raw_left.len();
         }
 
-        while read < body_len {
-            n = match stream.read_exact(buffer).await {
-                Ok(n) => n,
-                Err(err) => return Err(err),
+		while read < body_len {
+            n = match stream.read_exact(buffer).await? {
+				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
+                n => n,
             };
+
+			if n == 0 { return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")) }
 
             read += n;
 
