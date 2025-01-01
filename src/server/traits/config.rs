@@ -39,7 +39,7 @@ pub trait Config {
     /*------------------------------------------------------------*/
 
     fn parse_request(&self, request: &mut Request) -> Result<(), ResponseCode> {
-        eprintln!("Parsing request...");
+        // eprintln!("Parsing request...");
 
         self.parse_method(request)?;
 
@@ -195,7 +195,6 @@ pub mod utils {
     use std::{
         io::{self, ErrorKind},
         path::PathBuf,
-        usize,
     };
 
     use tokio::{
@@ -211,11 +210,6 @@ pub mod utils {
     };
 
     pub async fn build_auto_index(dir: &PathBuf) -> io::Result<Response> {
-        eprintln!(
-            "building auto-index for {:?}",
-            dir.to_string_lossy().to_string()
-        );
-
         let files_ref = html_files_ref_from(dir).await?;
         let files_ref = format_file_ref(files_ref);
 
@@ -364,7 +358,7 @@ pub mod utils {
         stream: &mut TcpStream,
         child: &mut Child,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         if let Some(mut stdin) = child.stdin.take() {
             if request.content_length().is_none() {
@@ -439,7 +433,7 @@ pub mod utils {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &mut [u8],
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         let content_length = request.content_length().unwrap().to_owned() as usize;
 
@@ -457,7 +451,7 @@ pub mod utils {
     async fn consume_stream(
         stream: &mut TcpStream,
         len: usize,
-        buffer: &mut [u8; 65536],
+        buffer: &mut [u8; 8196],
     ) -> io::Result<Vec<u8>> {
         let mut read = 0;
         let mut n = 0;

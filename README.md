@@ -10,7 +10,7 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
 
 - **Ports multiples** : Chaque bloc `server` peut écouter sur un port différent.  
 - **Support CGI** : Exécution des scripts `.py`, `.sh`, et `.php` via des interpréteurs définis.  
-- **Redirections** : Gestion facile des redirections permanentes ou temporaires.  
+- **Redirections** : Gestion facile des redirections permanentes ou temporaires.
 - **Limitations personnalisées** : Définir des tailles de body, méthodes autorisées ou règles spécifiques par chemin.  
 
 Il vous est possible de la modifier via le fichier conf.conf
@@ -22,5 +22,5 @@ Il vous est possible de la modifier via le fichier conf.conf
    ```bash
    git clone https://github.com/iibabyy/Rust-webServer.git
    cd webServer
-   unzip URIs.zip
-   cargo run --release
+   make unzip
+   make
