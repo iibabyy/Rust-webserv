@@ -40,10 +40,7 @@ pub mod parsing {
             return Err("invalid field: upload_folder".to_owned());
         }
 
-        let path = match PathBuf::from(&value[0]).canonicalize() {
-			Ok(path) => path,
-			Err(err) => return Err(format!("i/o error from upload_folder: {err}")),
-		};
+        let path = PathBuf::from(&value[0]);
 
         if path.exists() == false {
             match std::fs::create_dir_all(&path) {
