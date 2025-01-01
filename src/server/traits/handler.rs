@@ -38,7 +38,6 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
-        // eprintln!("Request: {request:#?}");
         match self.parse_request(&mut request) {
             Ok(location) => location,
             Err(err) => {
@@ -131,9 +130,8 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
-        eprintln!("executing CGI");
 
-        let (output, raw_left) = match self.execute_cgi(request, stream, raw_left, buffer).await {
+		let (output, raw_left) = match self.execute_cgi(request, stream, raw_left, buffer).await {
             Ok(res) => res,
             Err(err) => {
                 eprintln!(
@@ -150,7 +148,6 @@ pub trait Handler: Config {
             }
         };
 
-        eprintln!("sending CGI response");
         match Self::send_cgi_response(output, stream).await {
             Ok(_) => (),
             Err(err) => {
@@ -165,7 +162,6 @@ pub trait Handler: Config {
             }
         }
 
-        eprintln!("CGI response send !");
 
         Some(raw_left)
     }
@@ -173,7 +169,6 @@ pub trait Handler: Config {
     async fn send_cgi_response(cgi_output: Output, stream: &mut TcpStream) -> io::Result<()> {
         stream.write_all("HTTP/1.1 200 OK\r\n".as_bytes()).await?;
 
-        // eprintln!("CGI response: \n{:#?}", String::from_utf8_lossy(cgi_output.stdout.as_bytes()).to_string());
         stream.write_all(&cgi_output.stdout).await
     }
 
@@ -416,7 +411,7 @@ pub trait Handler: Config {
             if let Some(index) = raw_left.find_substring(boundary) {
                 file.write_all(&raw_left[..index - 2]).await?;
                 readed += index;
-                return Ok((raw_left[index/* + boundary.len() + 2 */..].to_vec(), readed));
+                return Ok((raw_left[index..].to_vec(), readed));
             }
 
             let security = if raw_left.len() > boundary.len() {
@@ -556,7 +551,7 @@ pub trait Handler: Config {
         upload_folder: &PathBuf,
         buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
-        let file = format!("{}/test", upload_folder.to_str().unwrap());
+        let file = format!("{}/default_upload", upload_folder.to_string_lossy());
 
         let mut file = match OpenOptions::new()
             .read(true)
@@ -583,37 +578,33 @@ pub trait Handler: Config {
         buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         let mut read = 0;
-        let mut n = 0;
-        let body_len = request.content_length().unwrap().clone() as usize;
+        let mut n;
+        let body_len = request.content_length().unwrap().clone();
 
         if body_len <= raw_left.len() {
-            file.write(&raw_left[..body_len]).await?;
+            file.write_all(&raw_left[..body_len]).await?;
             return Ok(raw_left[body_len..].to_vec());
         } else {
-            file.write(raw_left).await?;
+            file.write_all(raw_left).await?;
             read += raw_left.len();
         }
 
-		while read < body_len {
-            n = match stream.read_exact(buffer).await? {
+		loop {
+            n = match stream.read(buffer).await? {
 				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
                 n => n,
             };
 
-			if n == 0 { return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")) }
-
-            read += n;
-
-            if read > body_len {
-                file.write_all(&buffer[..(n - (read - body_len))]).await?;
+			read += n;
+			
+            if read >= body_len {
+				let too_much_read = read - body_len;
+                file.write_all(&buffer[..n - too_much_read]).await?;
+				return Ok(buffer[n - too_much_read..n].to_vec())
             } else {
-                file.write_all(&buffer[..n]).await?;
+				file.write_all(&buffer[..n]).await?;
             }
         }
-
-        let end = n - (read - body_len);
-
-        return Ok(buffer[end..].to_vec());
     }
 
     /*------------------------------------------------------------*/
@@ -621,7 +612,6 @@ pub trait Handler: Config {
     /*------------------------------------------------------------*/
 
     async fn build_response(&self, request: &Request) -> Result<Response, io::Error> {
-        // eprintln!("Building response...");
         if request.path().is_dir() {
             return utils::build_auto_index(request.path()).await;
         }
@@ -651,7 +641,6 @@ pub trait Handler: Config {
     async fn build_get_response(&self, request: &Request) -> Result<Response, io::Error> {
         let file = self.get_GET_request_file(request).await?;
 
-        // eprintln!("GET response build...");
         let mut response = Response::new(ResponseCode::default(), Method::GET).file(file);
 
         response.add_header("Content-Type".to_owned(), "text/html".to_owned());
@@ -661,7 +650,6 @@ pub trait Handler: Config {
 
     #[allow(non_snake_case)]
     async fn get_GET_request_file(&self, request: &Request) -> io::Result<File> {
-        // eprintln!("trying to open '{}'...", request.path().display());
         if request.path().is_file() {
             match File::open(request.path()).await {
                 Ok(file) => Ok(file),
@@ -698,12 +686,6 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Result<(Output, Vec<u8>), io::Error> {
-        // execute cgi :
-        //		- check program path
-        //		- execute path with Command::new() (set envs)
-        //		- send body to command stdin (previously piped)
-        //		- get output and check status
-        //		- return output
 
         if request.path().is_file() == false {
             return Err(io::Error::new(
@@ -715,7 +697,7 @@ pub trait Handler: Config {
         let file = request.path();
         let executor = self
             .cgi()
-            .get(file.extension().unwrap().to_str().unwrap())
+            .get(&file.extension().unwrap().to_string_lossy().to_string())
             .unwrap();
 
         let mut child = Command::new(executor)

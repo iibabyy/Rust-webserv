@@ -18,11 +18,11 @@ pub trait Config {
     fn alias(&self) -> Option<&PathBuf>;
     fn port(&self) -> Option<&u16>;
     fn index(&self) -> Option<&String>;
-    fn max_body_size(&self) -> Option<&usize>; //-
+    fn max_body_size(&self) -> Option<&usize>;
     fn name(&self) -> Option<&Vec<String>>;
     fn path(&self) -> &PathBuf;
     fn methods(&self) -> Option<&Vec<Method>>;
-    fn cgi(&self) -> &HashMap<String, PathBuf>; //-
+    fn cgi(&self) -> &HashMap<String, PathBuf>;
     fn error_pages(&self) -> &HashMap<u16, String>;
     fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)>;
     fn locations(&self) -> Option<&HashMap<PathBuf, Location>>;
@@ -39,7 +39,6 @@ pub trait Config {
     /*------------------------------------------------------------*/
 
     fn parse_request(&self, request: &mut Request) -> Result<(), ResponseCode> {
-        // eprintln!("Parsing request...");
 
         self.parse_method(request)?;
 
@@ -55,7 +54,6 @@ pub trait Config {
     fn format_path(&self, request: &mut Request) -> Result<(), ResponseCode> {
         self.add_root_or_alias(request)?;
         self.add_index_if_needed(request)?;
-        // let new_path =
         Ok(())
     }
 
@@ -96,10 +94,10 @@ pub trait Config {
 
     fn add_root_or_alias(&self, request: &mut Request) -> Result<(), ResponseCode> {
         let path = if self.alias().is_some() {
-            let path = request.path().to_str().unwrap().to_string();
+            let path = request.path().to_string_lossy();
             let path = path.replacen(
-                self.path().to_str().unwrap(),
-                self.alias().unwrap().to_str().unwrap(),
+                &self.path().to_string_lossy().to_string(),
+                &self.alias().unwrap().to_string_lossy().to_string(),
                 1,
             );
 
@@ -108,8 +106,8 @@ pub trait Config {
             let mut path = self.root().unwrap().clone();
             path = PathBuf::from(format!(
                 "{}{}",
-                path.to_str().unwrap(),
-                request.path().to_str().unwrap(),
+                path.to_string_lossy(),
+                request.path().to_string_lossy(),
             ));
 
             path
@@ -319,7 +317,6 @@ pub mod utils {
             html.push_str(&format!(
                 r#"        <button class="{}" onclick="window.location.href='{}'">{}</button>"#,
                 color_class,
-                // dir.to_string_lossy().to_string(),
                 file_name,
                 file_name
             ));
@@ -440,8 +437,6 @@ pub mod utils {
         if raw_left.len() >= content_length {
             return Ok(raw_left[content_length..].to_vec());
         }
-
-        // stream.read_exact(raw_left).await?;
 
         let length_missing = content_length - raw_left.len();
 

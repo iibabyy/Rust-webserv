@@ -20,7 +20,6 @@ pub struct Response {
     // header:
     code: ResponseCode,
     headers: HashMap<String, String>,
-
 	request_method: Method,
 
 	// body:
@@ -55,9 +54,6 @@ impl Response {
         let header = self.serialize_header().await;
 
         let buffer = header.as_bytes();
-        // let mut n = 0;
-
-        // eprintln!("Sending header [{header}]");
 
         match stream.write_all(buffer).await {
             Ok(_) => (),

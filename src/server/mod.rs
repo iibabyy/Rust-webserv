@@ -28,7 +28,7 @@ pub mod parsing {
 
         let path = PathBuf::from(&value[0]);
 
-        if path.to_str().unwrap().iter_elements().last() != Some('/') {
+        if path.to_string_lossy().chars().last() != Some('/') {
             return Err(value[0].clone() + ": alias must ends with '/'");
         }
 

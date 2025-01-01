@@ -4,6 +4,7 @@ use std::{
     net::IpAddr,
 };
 
+use colored::Colorize;
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, TcpStream},
@@ -65,23 +66,43 @@ impl Listener {
     }
 
     pub async fn listen(self) -> io::Result<()> {
-        println!(
-            "------[listener ({}): start listening]------",
-            self.listener.local_addr().unwrap()
-        );
+        println!("{}",
+			format!(
+				"------[listener ({}): start listening]------",
+				self.listener.local_addr().unwrap().to_string().italic()
+			)
+			.bold()
+			.black()
+		);
+
         loop {
             let cancel = self.cancel_token.clone();
             tokio::select! {
                 Ok((stream, addr)) = self.listener.accept() => {
-                    println!("------[Connection incoming: {addr}]------");
+                    println!(
+						"{}",
+						format!(
+							"------[Connection incoming: {}]------",
+							addr.to_string().italic()
+						)
+						.black()
+						.bold()
+					);
                     let server_instance = self.servers.clone();
                     tokio::spawn( async move {
                         let _ = Self::handle_stream(stream, &server_instance).await;
                     });
                 }
                 _ = cancel.cancelled() => {
-                    println!("------[listener ({}): stop listening]------", self.listener.local_addr().unwrap());
-                    return Ok(());
+                    println!("{}",
+						format!(
+							"------[listener ({}): stop listening]------",
+							self.listener.local_addr().unwrap().to_string().italic()
+						)
+						.black()
+						.bold()
+					);
+					return Ok(());
                 }
             }
         }
@@ -131,14 +152,14 @@ impl Listener {
                 eprintln!("Error: deserializing header: {}", err.to_string());
                 send_error_response(stream, err, buffer).await;
                 return Some(raw_left.to_vec());
-                // send error response bad request
             }
         };
 
         println!(
-            "[{}] [{}]",
-            request.method().to_string(),
-            request.path().display(),
+            "{} {} {}",
+			"[REQUEST]".bright_blue(),
+			request.method().to_string().bright_red(),
+            request.path().display().to_string().italic().bright_red(),
         );
 
         let server = Self::choose_server_from(&request, servers);
@@ -155,8 +176,6 @@ impl Listener {
 
     fn choose_server_from<'a>(request: &Request, servers: &'a Vec<Server>) -> &'a Server {
         let mut default = None;
-
-        // eprintln!("request:\n{request:#?}");
 
         if request.host().is_some() {
             let hostname = request.host().unwrap();
