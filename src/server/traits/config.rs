@@ -193,7 +193,6 @@ pub trait Config {
 #[allow(dead_code)]
 pub mod utils {
     use std::{
-        fmt::format,
         io::{self, ErrorKind},
         path::PathBuf,
         usize,
@@ -207,7 +206,7 @@ pub mod utils {
     };
 
     use crate::{
-        request::Request,
+        request::{Method, Request},
         response::response::{Response, ResponseCode},
     };
 
@@ -308,7 +307,7 @@ pub mod utils {
 
         html.push_str("</body>\r\n");
         html.push_str("</html>\r\n");
-        let mut response = Response::new(ResponseCode::new(200, "OK"));
+        let mut response = Response::new(ResponseCode::new(200, "OK"), Method::UNDEFINED);
 
         response.set_content(html);
 

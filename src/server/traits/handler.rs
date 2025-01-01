@@ -5,7 +5,7 @@ use std::{
     process::{Output, Stdio},
 };
 
-use nom::{AsBytes, FindSubstring, FindToken};
+use nom::{AsBytes, FindSubstring};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
@@ -24,6 +24,7 @@ use super::config::{
     Config,
 };
 
+#[allow(dead_code)]
 pub struct MultipartFile {
     filename: String,
     content_type: Option<String>,
@@ -68,8 +69,22 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 65536],
     ) -> Option<Vec<u8>> {
+		match self.handle_request_method(&request).await {
+			Ok(()) => (),
+			Err(err) => {
+				eprintln!("Error: {err}");
+				match utils::consume_body(&request, stream, raw_left, buffer).await {
+					Ok(raw_left) => return Some(raw_left),
+					Err(err) => {
+						eprintln!("Error: {err}");
+						return None
+					},
+				}
+			}
+		}
+
         let raw_left = match self
-            .handle_body_request(&request, stream, raw_left, buffer)
+            .handle_request_body(&request, stream, raw_left, buffer)
             .await
         {
             Ok(raw_left) => raw_left,
@@ -162,7 +177,7 @@ pub trait Handler: Config {
         stream.write_all(&cgi_output.stdout).await
     }
 
-    async fn handle_body_request(
+    async fn handle_request_body(
         &self,
         request: &Request,
         stream: &mut TcpStream,
@@ -173,17 +188,42 @@ pub trait Handler: Config {
             return Ok(raw_left.to_vec());
         }
 
+		/*	request body  */
         match request.method() {
-            &Method::POST => self.upload_body(request, stream, raw_left, buffer).await,
+            &Method::POST => self.handle_post(request, stream, raw_left, buffer).await,
+			&Method::DELETE => todo!(),
             _ => utils::consume_body(request, stream, raw_left, buffer).await,
         }
     }
 
     /*------------------------------------------------------------*/
+    /*-------------------[ Request Actions ]----------------------*/
+    /*------------------------------------------------------------*/
+    async fn handle_request_method(
+        &self,
+        request: &Request,
+    ) -> Result<(), io::Error> {
+        match request.method() {
+			&Method::DELETE => self.handle_delete(request).await,
+            _ => Ok(()),
+        }
+    }
+
+	async fn handle_delete(&self, request: &Request) -> Result<(), io::Error> {
+		if request.path().exists() == false {
+			return Err(io::Error::new(ErrorKind::NotFound, "file not found"))
+		} else if request.path().is_dir() {
+			return Err(io::Error::new(ErrorKind::NotFound, "file not found"))
+		}
+
+		tokio::fs::remove_file(request.path()).await
+	}
+
+    /*------------------------------------------------------------*/
     /*-----------------------[ Upload ]---------------------------*/
     /*------------------------------------------------------------*/
 
-    async fn upload_body(
+    async fn handle_post(
         &self,
         request: &Request,
         stream: &mut TcpStream,
@@ -300,9 +340,8 @@ pub trait Handler: Config {
                 }
             }
 
-            let temp = if temp.starts_with("\r\n") {
+            if temp.starts_with("\r\n") {
                 readed += 2;
-                temp[2..].as_bytes()
             } else {
                 return Err(io::Error::new(ErrorKind::InvalidData, "invalid boundary"));
             };
@@ -619,7 +658,7 @@ pub trait Handler: Config {
         let file = self.get_GET_request_file(request).await?;
 
         eprintln!("GET response build...");
-        let mut response = Response::new(ResponseCode::default()).file(file);
+        let mut response = Response::new(ResponseCode::default(), request.method().clone()).file(file);
 
         response.add_header("Content-Type".to_owned(), "text/html".to_owned());
 

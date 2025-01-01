@@ -317,7 +317,7 @@ impl Request {
 /*										METHOD										  */
 /*------------------------------------------------------------------------------------*/
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Method {
     UNDEFINED,
     GET,

@@ -13,13 +13,17 @@ use tokio::{
     net::TcpStream,
 };
 
+use crate::request::Method;
+
 #[derive(Default, Debug)]
 pub struct Response {
     // header:
     code: ResponseCode,
     headers: HashMap<String, String>,
 
-    // body:
+	request_method: Method,
+
+	// body:
     pub file: Option<File>,
     content: String,
 }
@@ -40,7 +44,9 @@ impl Response {
             Err(Some(err)) => return Err(err),
         }
 
-        self.send_body(stream, buffer).await?;
+		if self.body_allowed() {
+			self.send_body(stream, buffer).await?;
+		}
 
         Ok(())
     }
@@ -66,6 +72,7 @@ impl Response {
         stream: &mut TcpStream,
         buffer: &mut [u8; 65536],
     ) -> io::Result<()> {
+
         if self.file.is_some() {
             loop {
                 let n = self.file.as_mut().unwrap().read(buffer).await?;
@@ -82,6 +89,17 @@ impl Response {
         Ok(())
     }
 
+	fn body_allowed(&self) -> bool {
+		return
+		if self.code.code == 204 || self.code.code == 304 {
+			false
+		} else if self.request_method == Method::HEAD {
+			false
+		} else {
+			true
+		};
+	}
+
     async fn serialize_header(&mut self) -> String {
         let first_line: String = format!(
             "HTTP/1.1 {} {}\r\n",
@@ -95,8 +113,9 @@ impl Response {
             self.content.len()
         };
 
-        self.headers
-            .insert("Content-Length".to_owned(), body_len.to_string());
+		if self.body_allowed() == true {
+			self.headers.insert("Content-Length".to_owned(), body_len.to_string());
+		}
 
         let mut headers: String = self
             .headers
@@ -112,11 +131,7 @@ impl Response {
         format!("{first_line}{headers}\r\n")
     }
 
-    /*-------------------------------------------*/
-    /*----------------[ UTILS ]------------------*/
-    /*-------------------------------------------*/
-
-    pub fn new(code: ResponseCode) -> Response {
+    pub fn new(code: ResponseCode, request_method: Method) -> Response {
         let msg = code.to_string().clone();
         let mut headers = HashMap::new();
 
@@ -130,6 +145,7 @@ impl Response {
         Response {
             code,
             headers,
+			request_method,
             file: None,
             content: msg,
         }

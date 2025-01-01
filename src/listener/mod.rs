@@ -1,23 +1,22 @@
 use std::{
     collections::HashMap,
-    fmt::format,
-    io::{self, ErrorKind, SeekFrom},
+    io::{self},
     net::IpAddr,
 };
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{unix::SocketAddr, TcpListener, TcpStream},
+    io::AsyncReadExt,
+    net::{TcpListener, TcpStream},
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    request::Request,
+    request::{Method, Request},
     response::response::{Response, ResponseCode},
     server::{
         server::Server,
         traits::{
-            config::{utils, Config},
+            config::{utils::{self}, Config},
             handler::Handler,
         },
     },
@@ -119,10 +118,6 @@ impl Listener {
                 }
             }
         }
-
-        stream.shutdown().await?;
-
-        Ok(())
     }
 
     async fn handle_request(
@@ -145,13 +140,10 @@ impl Listener {
         let server = Self::choose_server_from(&request, servers);
 
         let raw_left = if let Some(location) = server.get_request_location(&request) {
-            location
-                .handle_request(request, stream, raw_left, buffer)
-                .await
+
+			location.handle_request(request, stream, raw_left, buffer).await
         } else {
-            server
-                .handle_request(request, stream, raw_left, buffer)
-                .await
+            server.handle_request(request, stream, raw_left, buffer).await
         };
 
         return raw_left;
@@ -193,7 +185,7 @@ pub async fn send_error_response(
     code: ResponseCode,
     buffer: &mut [u8; 65536],
 ) {
-    let mut response = Response::new(code);
+    let mut response = Response::new(code, Method::UNDEFINED);
 
     let _ = response.send(stream, buffer).await;
 }
