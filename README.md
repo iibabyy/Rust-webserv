@@ -21,5 +21,4 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
    ```bash
    git clone https://github.com/iibabyy/Rust-webserv.git
    cd Rust-webserv
-   make unzip
    make
