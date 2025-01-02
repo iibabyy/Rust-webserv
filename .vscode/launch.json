@@ -7,16 +7,16 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Debug executable 'webServer'",
+			"name": "Debug executable 'webserv'",
 			"cargo": {
 				"args": [
 					"build",
-					"--bin=webServer",
+					"--bin=webserv",
 					"--release",
-					"--package=webServer"
+					"--package=webserv"
 				],
 				"filter": {
-					"name": "webServer",
+					"name": "webserv",
 					"kind": "bin"
 				}
 			},
@@ -26,16 +26,16 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Debug unit tests in executable 'webServer'",
+			"name": "Debug unit tests in executable 'webserv'",
 			"cargo": {
 				"args": [
 					"test",
 					"--no-run",
-					"--bin=webServer",
-					"--package=webServer"
+					"--bin=webserv",
+					"--package=webserv"
 				],
 				"filter": {
-					"name": "webServer",
+					"name": "webserv",
 					"kind": "bin"
 				}
 			},

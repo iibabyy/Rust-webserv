@@ -117,7 +117,6 @@ pub trait Config {
 
         if path.is_dir() && path.to_string_lossy().ends_with("/") == false {
             let redirect = PathBuf::from(format!("{}/", request.path().to_string_lossy()));
-            eprintln!("redirected on {}", redirect.display());
             let response = ResponseCode::new_redirect(301, "Moved Premanently", redirect);
             return Err(response);
         }
@@ -129,11 +128,9 @@ pub trait Config {
     fn parse_method(&self, request: &Request) -> Result<(), ResponseCode> {
         let methods = self.methods();
         if methods.is_none() {
-            eprintln!("NO METHODS ALLOWED");
             return Err(ResponseCode::from_code(405));
         } // No method allowed
         if !methods.as_ref().unwrap().contains(request.method()) {
-            eprintln!("METHOD NOT ALLOWED !");
             return Err(ResponseCode::from_code(405));
         } // Ok
 

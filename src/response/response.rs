@@ -37,19 +37,15 @@ impl Response {
         stream: &mut TcpStream,
         buffer: &mut [u8; 8196],
     ) -> io::Result<()> {
-		eprintln!("sending header");
         match self.send_header(stream).await {
             Ok(_) => (),
             Err(None) => return Ok(()), // end of stream
             Err(Some(err)) => return Err(err),
         }
-		eprintln!("header sent");
 
-		eprintln!("sending body");
 		if self.body_allowed() {
 			self.send_body(stream, buffer).await?;
 		}
-		eprintln!("body sent");
 
         Ok(())
     }

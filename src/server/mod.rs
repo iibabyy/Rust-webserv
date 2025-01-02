@@ -9,7 +9,6 @@ pub mod traits;
 pub mod parsing {
     use std::{collections::HashMap, path::PathBuf};
 
-    use nom::InputIter;
 
     pub fn extract_root(value: Vec<String>) -> Result<PathBuf, String> {
         if value.len() != 1 {

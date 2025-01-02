@@ -94,18 +94,12 @@ pub trait Handler: Config {
                     _ => {
                         println!("Error: handling body: {}", err.to_string());
                         send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-
-                        if request.keep_connection_alive() == true {
-                            return Some(raw_left.to_vec()); // keep stream alive
-                        } else {
-                            return None; // kill stream
-                        };
+						return None; // kill stream
                     }
                 }
             }
         };
 
-		eprintln!("send response");
         match self.send_response(stream, &request, buffer).await {
             Ok(_) => (),
             Err(err) => {
@@ -114,7 +108,6 @@ pub trait Handler: Config {
                 if err.kind() == ErrorKind::UnexpectedEof { return None }
             }
         }
-		eprintln!("response send");
 
         if request.keep_connection_alive() == true
 		{
@@ -187,7 +180,6 @@ pub trait Handler: Config {
 		/*	request body  */
         match request.method() {
             &Method::POST => self.handle_post(request, stream, raw_left, buffer).await,
-			&Method::DELETE => todo!(),
             _ => utils::consume_body(request, stream, raw_left, buffer).await,
         }
     }
@@ -226,10 +218,8 @@ pub trait Handler: Config {
         raw_left: &[u8],
         buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
-        eprintln!("uploading file");
 
         if request.content_length().is_none() {
-            eprintln!("No content length -> No upload");
             return Ok(raw_left.to_vec());
         } else if self.upload_folder().is_none() {
             eprintln!("no upload folder");
@@ -257,7 +247,6 @@ pub trait Handler: Config {
             }
         };
 
-        eprintln!("finish upload");
         return res;
     }
 
@@ -630,9 +619,7 @@ pub trait Handler: Config {
         request: &Request,
         buffer: &mut [u8; 8196],
     ) -> Result<(), io::Error> {
-        eprintln!("building response");
 		let mut response = self.build_response(request).await?;
-        eprintln!("response build");
 
         response.send(stream, buffer).await
     }

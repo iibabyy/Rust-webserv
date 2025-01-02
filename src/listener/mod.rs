@@ -6,7 +6,7 @@ use std::{
 
 use colored::Colorize;
 use tokio::{
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
 use tokio_util::sync::CancellationToken;
@@ -72,7 +72,7 @@ impl Listener {
 				self.listener.local_addr().unwrap().to_string().italic()
 			)
 			.bold()
-			.black()
+			.bright_black()
 		);
 
         loop {
@@ -85,7 +85,7 @@ impl Listener {
 							"------[Connection incoming: {}]------",
 							addr.to_string().italic()
 						)
-						.black()
+						.bright_black()
 						.bold()
 					);
                     let server_instance = self.servers.clone();
@@ -99,7 +99,7 @@ impl Listener {
 							"------[listener ({}): stop listening]------",
 							self.listener.local_addr().unwrap().to_string().italic()
 						)
-						.black()
+						.bright_black()
 						.bold()
 					);
 					return Ok(());
@@ -133,7 +133,10 @@ impl Listener {
                 .await
                 {
                     Some(raw_left) => raw_left,
-                    None => return Ok(()),
+                    None => {
+						let _ = stream.shutdown();
+						return Ok(())
+					},
                 }
             }
         }
