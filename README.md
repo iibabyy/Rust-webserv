@@ -21,6 +21,6 @@ Il vous est possible de la modifier via le fichier conf.conf
 1. Clone le projet et lance le :  
    ```bash
    git clone https://github.com/iibabyy/Rust-webServer.git
-   cd webServer
+   cd Rust-webServer
    make unzip
    make
