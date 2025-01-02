@@ -66,7 +66,7 @@ async fn main() {
     let config_file = if config_file.is_some() {
         config_file.unwrap()
     } else {
-        "conf.conf".to_owned()
+        "default.conf".to_owned()
     };
 
     let cancel_token = CancellationToken::new();

@@ -13,7 +13,7 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
 - **Redirections** : Gestion facile des redirections permanentes ou temporaires.
 - **Limitations personnalisées** : Définir des tailles de body, méthodes autorisées ou règles spécifiques par chemin.  
 
-Il vous est possible de la modifier via le fichier conf.conf
+Il vous est possible de la modifier via le fichier default.conf
 ---
 
 ## **Lancer le serveur**  
