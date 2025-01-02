@@ -38,57 +38,23 @@ pub struct Location {
 impl Handler for Location {}
 
 impl Config for Location {
-    fn path(&self) -> &PathBuf /*----------------------------------*/ {
-        &self.path
-    }
-    fn internal(&self) -> bool /*----------------------------------*/ {
-        self.internal
-    }
-    fn auto_index(&self) -> bool /*--------------------------------*/ {
-        self.auto_index
-    }
-    fn is_location(&self) -> bool /*-------------------------------*/ {
-        false
-    }
-    fn index(&self) -> Option<&String> /*--------------------------*/ {
-        self.index.as_ref()
-    }
-    fn root(&self) -> Option<&PathBuf> /*--------------------------*/ {
-        self.root.as_ref()
-    }
-    fn alias(&self) -> Option<&PathBuf> /*-------------------------*/ {
-        self.alias.as_ref()
-    }
-    fn methods(&self) -> Option<&Vec<Method>> /*-------------------*/ {
-        self.methods.as_ref()
-    }
-    fn max_body_size(&self) -> Option<&usize> /*---------------------*/ {
-        self.max_body_size.as_ref()
-    }
-    fn cgi(&self) -> &HashMap<String, PathBuf> /*------------------*/ {
-        &self.cgi
-    }
-    fn upload_folder(&self) -> Option<&PathBuf> /*-----------------*/ {
-        self.upload_folder.as_ref()
-    }
-    fn error_pages(&self) -> &HashMap<u16, String> /*--------------*/ {
-        &self.error_pages
-    }
-    fn return_(&self) -> Option<&(u16, Option<String>)> /*---------*/ {
-        self.return_.as_ref()
-    }
-    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)> {
-        &self.error_redirect
-    }
-    fn port(&self) -> Option<&u16> /*------------------------------*/ {
-        None
-    }
-    fn name(&self) -> Option<&Vec<String>> /*----------------------*/ {
-        None
-    }
-    fn locations(&self) -> Option<&HashMap<PathBuf, Location>> /*--*/ {
-        None
-    }
+    fn path(&self) -> &PathBuf /*---------------------------------*/ { &self.path }
+    fn internal(&self) -> bool /*---------------------------------*/ { self.internal }
+    fn auto_index(&self) -> bool /*-------------------------------*/ { self.auto_index }
+    fn is_location(&self) -> bool /*------------------------------*/ { false }
+    fn index(&self) -> Option<&String> /*-------------------------*/ { self.index.as_ref() }
+    fn root(&self) -> Option<&PathBuf> /*-------------------------*/ { self.root.as_ref() }
+    fn alias(&self) -> Option<&PathBuf> /*------------------------*/ { self.alias.as_ref() }
+    fn methods(&self) -> Option<&Vec<Method>> /*------------------*/ { self.methods.as_ref() }
+    fn max_body_size(&self) -> Option<&usize> /*------------------*/ { self.max_body_size.as_ref() }
+    fn cgi(&self) -> &HashMap<String, PathBuf> /*-----------------*/ { &self.cgi }
+    fn upload_folder(&self) -> Option<&PathBuf> /*----------------*/ { self.upload_folder.as_ref() }
+    fn error_pages(&self) -> &HashMap<u16, String> /*-------------*/ { &self.error_pages }
+    fn return_(&self) -> Option<&(u16, Option<String>)> /*--------*/ { self.return_.as_ref() }
+    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)> { &self.error_redirect }
+    fn port(&self) -> Option<&u16> /*-----------------------------*/ { None }
+    fn name(&self) -> Option<&Vec<String>> /*---------------------*/ { None }
+    fn locations(&self) -> Option<&HashMap<PathBuf, Location>> /*-*/ { None }
 }
 
 #[allow(dead_code)]
@@ -118,30 +84,19 @@ impl Location {
         for (name, infos) in location.directives {
             match name.as_str() {
                 "root" => {
-                    // ROOT
-                    if new_location.root.is_some() {
-                        return Err(format!(
-                            "invalid field: root: root cannot be set with alias"
-                        ));
-                    }
-
+                    if new_location.root.is_some() { return Err(format!("invalid field: root: root cannot be set with alias")); }
+  
                     let root = parsing::extract_root(infos);
                     match root {
+						Ok(path) => new_location.root = Some(path),
                         Err(e) => {
-                            return Err(format!(
-                                "location ({}) : {}",
-                                new_location.path.display(),
-                                e
-                            ))
-                        }
-                        Ok(path) => new_location.root = Some(path),
+							return Err(format!("location ({}) : {}", new_location.path.display(), e))
+						},
                     }
                 }
                 "alias" => {
                     if new_location.root.is_some() {
-                        return Err(format!(
-                            "invalid field: alias: alias cannot be set with root"
-                        ));
+                        return Err(format!("invalid field: alias: alias cannot be set with root"));
                     } else {
                         new_location.alias = Some(parsing::extract_alias(infos)?)
                     }
@@ -152,27 +107,19 @@ impl Location {
                 "index" => {
                     let index = parsing::extract_index(infos);
                     match index {
+						Ok(index) => new_location.index = Some(index),
                         Err(e) => {
-                            return Err(format!(
-                                "location ({}) : {}",
-                                new_location.path.display(),
-                                e
-                            ))
-                        }
-                        Ok(index) => new_location.index = Some(index),
+                            return Err(format!("location ({}) : {}", new_location.path.display(), e))
+                        },
                     }
                 }
                 "auto_index" => {
                     let auto_index = parsing::extract_auto_index(infos);
                     match auto_index {
+						Ok(is_true) => new_location.auto_index = is_true,
                         Err(e) => {
-                            return Err(format!(
-                                "location ({}) : {}",
-                                new_location.path.display(),
-                                e
-                            ))
-                        }
-                        Ok(is_true) => new_location.auto_index = is_true,
+                            return Err(format!("location ({}) : {}", new_location.path.display(), e))
+                        },
                     }
                 }
                 "client_max_body_size" => {
@@ -276,10 +223,23 @@ impl Location {
 
         if new_location.none_cgi == true {
             new_location.cgi.clear();
-        }
+        } if new_location.upload_folder.is_some() && new_location.root.is_some() {
+			Self::add_root_to_upload_folder(&mut new_location);	
+		}
 
         Ok(new_location)
     }
+
+	fn add_root_to_upload_folder(location: &mut Location) {
+		let upload_folder = location.upload_folder.as_ref().unwrap().to_string_lossy();
+		let root = location.root.as_ref().unwrap().to_string_lossy();
+		
+		let upload_folder = PathBuf::from(
+			format!("{upload_folder}/{root}")
+		);
+
+		location.upload_folder = Some(upload_folder);
+	}
 
     fn complete_with_server_directives(&mut self, server: &Server) {
         self.internal = self.internal || server.internal();
@@ -297,14 +257,10 @@ impl Location {
         if self.max_body_size.is_none() && server.max_body_size().is_some() {
             self.max_body_size = Some(server.max_body_size().unwrap().clone());
         }
-        // if self.methods.is_none() && server.methods().is_some() {
-        //     self.methods = Some(server.methods().unwrap().clone());
-        // }
         if self.return_.is_none() && server.return_().is_some() {
             self.return_ = Some(server.return_().unwrap().clone());
         }
-
-        if self.cgi.is_empty() && !server.cgi().is_empty() {
+		if self.cgi.is_empty() && !server.cgi().is_empty() {
             self.cgi = server.cgi().clone();
         }
         if self.error_pages.is_empty() && !server.error_pages().is_empty() {

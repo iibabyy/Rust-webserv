@@ -1,15 +1,3 @@
-/* ************************************************************************** */
-/*																			*/
-/*														:::	  ::::::::   */
-/*   server.rs										  :+:	  :+:	:+:   */
-/*													+:+ +:+		 +:+	 */
-/*   By: ibaby <ibaby@student.42.fr>				+#+  +:+	   +#+		*/
-/*												+#+#+#+#+#+   +#+		   */
-/*   Created: 2024/12/15 05:34:36 by ibaby			 #+#	#+#			 */
-/*   Updated: 2024/12/20 11:43:12 by ibaby			###   ########.fr	   */
-/*																			*/
-/* ************************************************************************** */
-
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 
 use crate::{request::Method, LocationBlock, ServerBlock};
@@ -50,57 +38,23 @@ pub struct Server {
 impl Handler for Server {}
 
 impl Config for Server {
-    fn path(&self) -> &PathBuf /*----------------------------------*/ {
-        &self.path
-    }
-    fn internal(&self) -> bool /*----------------------------------*/ {
-        self.internal
-    }
-    fn auto_index(&self) -> bool /*--------------------------------*/ {
-        self.auto_index
-    }
-    fn is_location(&self) -> bool /*-------------------------------*/ {
-        false
-    }
-    fn port(&self) -> Option<&u16> /*------------------------------*/ {
-        self.port.as_ref()
-    }
-    fn index(&self) -> Option<&String> /*--------------------------*/ {
-        self.index.as_ref()
-    }
-    fn root(&self) -> Option<&PathBuf> /*--------------------------*/ {
-        self.root.as_ref()
-    }
-    fn alias(&self) -> Option<&PathBuf> /*-------------------------*/ {
-        None
-    }
-    fn name(&self) -> Option<&Vec<String>> /*----------------------*/ {
-        self.name.as_ref()
-    }
-    fn methods(&self) -> Option<&Vec<Method>> /*-------------------*/ {
-        self.methods.as_ref()
-    }
-    fn max_body_size(&self) -> Option<&usize> /*---------------------*/ {
-        self.max_body_size.as_ref()
-    }
-    fn cgi(&self) -> &HashMap<String, PathBuf> /*------------------*/ {
-        &self.cgi
-    }
-    fn upload_folder(&self) -> Option<&PathBuf> /*-----------------*/ {
-        self.upload_folder.as_ref()
-    }
-    fn error_pages(&self) -> &HashMap<u16, String> /*--------------*/ {
-        &self.error_pages
-    }
-    fn return_(&self) -> Option<&(u16, Option<String>)> /*---------*/ {
-        self.return_.as_ref()
-    }
-    fn locations(&self) -> Option<&HashMap<PathBuf, Location>> /*--*/ {
-        Some(&self.locations)
-    }
-    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)> {
-        &self.error_redirect
-    }
+    fn path(&self) -> &PathBuf /*---------------------------------*/ { &self.path }
+    fn internal(&self) -> bool /*---------------------------------*/ { self.internal }
+    fn auto_index(&self) -> bool /*-------------------------------*/ { self.auto_index }
+    fn is_location(&self) -> bool /*------------------------------*/ { false }
+    fn port(&self) -> Option<&u16> /*-----------------------------*/ { self.port.as_ref() }
+    fn index(&self) -> Option<&String> /*-------------------------*/ { self.index.as_ref() }
+    fn root(&self) -> Option<&PathBuf> /*-------------------------*/ { self.root.as_ref() }
+    fn alias(&self) -> Option<&PathBuf> /*------------------------*/ { None }
+    fn name(&self) -> Option<&Vec<String>> /*---------------------*/ { self.name.as_ref() }
+    fn methods(&self) -> Option<&Vec<Method>> /*------------------*/ { self.methods.as_ref() }
+    fn max_body_size(&self) -> Option<&usize> /*------------------*/ { self.max_body_size.as_ref() }
+    fn cgi(&self) -> &HashMap<String, PathBuf> /*-----------------*/ { &self.cgi }
+    fn upload_folder(&self) -> Option<&PathBuf> /*----------------*/ { self.upload_folder.as_ref() }
+    fn error_pages(&self) -> &HashMap<u16, String> /*-------------*/ { &self.error_pages }
+    fn return_(&self) -> Option<&(u16, Option<String>)> /*--------*/ { self.return_.as_ref() }
+    fn locations(&self) -> Option<&HashMap<PathBuf, Location>> /*-*/ { Some(&self.locations) }
+    fn error_redirect(&self) -> &HashMap<u16, (Option<u16>, String)> { &self.error_redirect }
 }
 
 /*---------------------------------------------------------------*/

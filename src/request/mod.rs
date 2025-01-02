@@ -86,70 +86,7 @@ impl TryFrom<&[u8]> for Request {
 }
 
 impl Request {
-    // pub fn push(&mut self, request: &str) -> Result<Option<String>, u16> {
-    //	 if self.state != State::Undefined && self.state != State::OnHeader {
-    //		 todo!()
-    //	 }
-
-    // 	self.state = State::OnHeader;
-    //	 let (header, rest) = match request.split_once("\r\n\r\n") {
-    //		 None => {
-    //			 // Header not finished
-    //			 self.raw_header.push_str(&request);
-    //			 return Ok(None);
-    //		 }
-    //		 Some((header, rest)) => (header, rest),
-    //	 };
-    //	 // Header complete
-    //	 self.raw_header.push_str(header);
-    //	 if rest.is_empty() == false {
-    // 		self.raw_body = Some(rest.to_owned());
-    //	 }
-
-    //	 self.deserialize()?;
-    //	 self.raw_header.clear();
-    //	 self.state = if self.raw_body.is_some() {
-    // 		State::OnBody
-    //	 } else {
-    //		 State::Finished
-    //	 };
-
-    //	 Ok(())
-    // }
-
-    // async fn from(mut stream: &mut TcpStream) -> Result<Self, RequestError> {
-    // 	let headers = Self::read_header_from(&mut stream).await?;
-
-    // 	let request = match Self::deserialize(headers) {
-    // 		Ok(request) => request,
-    // 		Err(err) => return Err(RequestError::from(err)),
-    // 	};
-
-    // 	Ok(request)
-    // }
-
-    // async fn read_header_from(mut stream: &mut TcpStream) -> io::Result<Vec<String>> {
-    // 	let mut headers = vec![];
-    // 	let mut size = 0;
-
-    // 	while size < 4096 {
-    // 		stream.readable().await;
-    // 		let reader = BufReader::new(&mut stream);
-    // 		let mut lines = reader.lines();
-
-    // 		while let Some(line) = lines.next_line().await? {
-    // 			if line.is_empty() { return Ok(headers) }
-    // 			size += line.as_bytes().len();
-    // 			headers.push(line);
-    // 		}
-    // 	}
-
-    // 	Err(io::Error::new(io::ErrorKind::FileTooLarge, "header too large: expected less than 4096 bytes"))
-
-    // }
-
     fn deserialize(headers: Vec<String>) -> Result<Self, String> {
-        // eprintln!("Deserializing header...");
         let mut headers: Iter<'_, String> = headers.iter();
         let first_line = headers.next();
         if first_line.is_none() {
@@ -317,7 +254,7 @@ impl Request {
 /*										METHOD										  */
 /*------------------------------------------------------------------------------------*/
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Method {
     UNDEFINED,
     GET,
