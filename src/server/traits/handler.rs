@@ -554,10 +554,12 @@ pub trait Handler: Config {
         }
 
 		while read < body_len {
-            n = match stream.read_exact(buffer).await? {
+            n = match stream.read(buffer).await? {
 				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
                 n => n,
             };
+
+			eprintln!("n: {n}	|	read: {read}");
 
 			if n == 0 { return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")) }
 
@@ -572,7 +574,7 @@ pub trait Handler: Config {
 
         let end = n - (read - body_len);
 
-        return Ok(buffer[end..].to_vec());
+        return Ok(buffer[end..n].to_vec());
     }
 
     /*------------------------------------------------------------*/
