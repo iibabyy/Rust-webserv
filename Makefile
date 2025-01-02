@@ -1,17 +1,20 @@
 all: run
 
 run:
-	@cargo run --release --quiet
+	@cargo build --release
+	@clear
+	@target/release/webServer
 
 unzip:
 	@unzip URIs.zip
 	@unzip URIs2.zip
 
 debug:
-	@cargo run --keep-going
+	@cargo build --keep-going
+	@target/debug/webServer
 
 watch:
-	@cargo watch -x run
+	@cargo watch -q -x run
 
 clean:
 	@cargo clean

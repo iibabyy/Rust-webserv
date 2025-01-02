@@ -105,22 +105,23 @@ pub trait Handler: Config {
             }
         };
 
+		eprintln!("send response");
         match self.send_response(stream, &request, buffer).await {
             Ok(_) => (),
             Err(err) => {
                 println!("Error: sending response: {err}");
                 send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-                return if request.keep_connection_alive() == true
-                    && err.kind() != ErrorKind::UnexpectedEof
-                {
-                    Some(raw_left)
-                } else {
-                    None
-                };
+                if err.kind() == ErrorKind::UnexpectedEof { return None }
             }
         }
+		eprintln!("response send");
 
-        Some(raw_left)
+        if request.keep_connection_alive() == true
+		{
+			return Some(raw_left)
+		} else {
+			return None
+		}
     }
 
     async fn handle_cgi(
@@ -629,7 +630,9 @@ pub trait Handler: Config {
         request: &Request,
         buffer: &mut [u8; 8196],
     ) -> Result<(), io::Error> {
-        let mut response = self.build_response(request).await?;
+        eprintln!("building response");
+		let mut response = self.build_response(request).await?;
+        eprintln!("response build");
 
         response.send(stream, buffer).await
     }
