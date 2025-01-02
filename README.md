@@ -12,8 +12,7 @@ La configuration du serveur repose sur des blocs de type **`server`** et **`loca
 - **Support CGI** : Exécution des scripts `.py`, `.sh`, et `.php` via des interpréteurs définis.  
 - **Redirections** : Gestion facile des redirections permanentes ou temporaires.
 - **Limitations personnalisées** : Définir des tailles de body, méthodes autorisées ou règles spécifiques par chemin.  
-
-Il vous est possible de la modifier via le fichier conf.conf
+- **Configuration** : Il vous est possible de la modifier via le fichier conf.conf
 ---
 
 ## **Lancer le serveur**  
