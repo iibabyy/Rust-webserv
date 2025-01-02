@@ -8,7 +8,7 @@ Un serveur web en asynchrone, rapide et simple basé sur Rust, capable de servir
 
 La configuration du serveur repose sur des blocs de type **`server`** et **`location`**, similaires à ceux de NGINX. Voici quelques points clés de la configuration :  
 
-- **Ports multiples** : Chaque bloc `server` peut écouter sur un port différent.  
+- **Ports multiples** : Chaque bloc `server` peut écouter sur un port.  
 - **Support CGI** : Exécution des scripts `.py`, `.sh`, et `.php` via des interpréteurs définis.  
 - **Redirections** : Gestion facile des redirections permanentes ou temporaires.
 - **Limitations personnalisées** : Définir des tailles de body, méthodes autorisées ou règles spécifiques par chemin.  
