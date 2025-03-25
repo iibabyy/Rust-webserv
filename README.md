@@ -1,24 +1,93 @@
-# **webserv**
+# Rust Web Server
+A high-performance web server implemented in Rust, inspired by nginx's architecture and features.
 
-Un serveur web en asynchrone, rapide et simple basé sur Rust, capable de servir des fichiers statiques, exécuter des scripts CGI, et rediriger les requêtes avec une configuration flexible.
+## Features
 
----
+### Core Functionality
+- HTTP/1.1 protocol support
+- Keep-alive connection handling
+- Asynchronous I/O using Tokio
+- Configurable server blocks
+- Multiple server support (virtual hosting)
 
-## **Configuration**  
+### Request Handling
+- Support for GET and POST methods
+- Content-Length validation
+- Maximum body size limits
+- Custom error pages and redirects
 
-La configuration du serveur repose sur des blocs de type **`server`** et **`location`**, similaires à ceux de NGINX. Voici quelques points clés de la configuration :  
+### Static File Serving
+- Directory listing with auto-indexing
+- Custom index file configuration
+- Root directory configuration
+- Stylish auto-generated directory listings with gradient backgrounds
 
-- **Ports multiples** : Chaque bloc `server` peut écouter sur un port.  
-- **Support CGI** : Exécution des scripts `.py`, `.sh`, et `.php` via des interpréteurs définis.  
-- **Redirections** : Gestion facile des redirections permanentes ou temporaires.
-- **Limitations personnalisées** : Définir des tailles de body, méthodes autorisées ou règles spécifiques par chemin.  
-- **Configuration** : Il vous est possible de la modifier via le fichier default.conf
----
+### CGI Support
+- Dynamic content generation through CGI scripts
+- CGI environment variable handling
+- Request body forwarding to CGI scripts
+- Configurable CGI extensions and paths
 
-## **Lancer le serveur**  
+### Location Blocks
+- Path-based configuration blocks
+- Alias support
+- Internal location handling
+- Custom routing rules
 
-1. Clone le projet et lance le :  
-   ```bash
-   git clone https://github.com/iibabyy/Rust-webserv.git
-   cd Rust-webserv
-   make
+### Configuration
+- Server name configuration
+- Port binding configuration
+- Upload folder specification
+- Client max body size limits
+- Multiple methods restriction
+- Custom error pages
+- Return directives for redirects
+
+### Error Handling
+- Comprehensive error reporting
+- Custom error page mapping
+- Error redirects with status codes
+- Graceful connection handling
+
+## Configuration Example
+```nginx
+server {
+    listen 8080;
+    server_name example.com;
+    root /var/www/html;
+    
+    client_max_body_size 10M;
+    auto_index on;
+    
+    location /uploads {
+        upload_folder /var/www/uploads;
+        methods GET POST;
+    }
+    
+    location /cgi-bin {
+        cgi .php /usr/bin/php-cgi;
+    }
+}
+```
+
+## Building and Running
+
+### Prerequisites
+- Rust (latest stable version)
+- Cargo
+
+### Build
+```bash
+cargo build --release
+```
+
+### Run
+```bash
+cargo run --release
+```
+
+## Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+[Add your chosen license here]
