@@ -86,8 +86,29 @@ cargo build --release
 cargo run --release
 ```
 
+## Performances
+
+This test is not very scientific and were simply small experiments to see roughly how my web server is perfoming
+
+'''
+bombardier http://localhost:8080/ -c 1000 --latencies --fasthttp -H "Connection
+: Close"
+Bombarding http://localhost:8080/ for 10s using 1000 connection(s)
+[========================================================================================================================] 10s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec     10256.26    2923.56   19914.07
+  Latency       97.03ms    30.06ms   511.95ms
+  Latency Distribution
+     50%    93.78ms
+     75%   108.64ms
+     90%   124.37ms
+     95%   136.59ms
+     99%   181.70ms
+  HTTP codes:
+    1xx - 0, 2xx - 103328, 3xx - 0, 4xx - 0, 5xx - 0
+    others - 0
+'''
+
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-[Add your chosen license here]
