@@ -158,12 +158,12 @@ impl Listener {
             }
         };
 
-        println!(
-            "{} {} {}",
-			"[REQUEST]".bright_blue(),
-			request.method().to_string().bright_red(),
-            request.path().display().to_string().italic().bright_red(),
-        );
+        // println!(
+        //     "{} {} {}",
+		// 	"[REQUEST]".bright_blue(),
+		// 	request.method().to_string().bright_red(),
+        //     request.path().display().to_string().italic().bright_red(),
+        // );
 
         let server = Self::choose_server_from(&request, servers);
 
