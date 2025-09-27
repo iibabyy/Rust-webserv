@@ -88,7 +88,7 @@ cargo run --release
 
 ## Performances
 
-This test is not very scientific and were simply small experiments to see roughly how my web server is perfoming
+This test is not very scientific and was simply a small experiment to see roughly how my web server is performing
 
 ```bash
 bombardier http://localhost:8080/ -c 1000 --latencies --fasthttp -H "Connection
@@ -109,6 +109,3 @@ Statistics        Avg      Stdev        Max
     1xx - 0, 2xx - 103328, 3xx - 0, 4xx - 0, 5xx - 0
     others - 0
 ```
-
-## Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
