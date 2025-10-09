@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, path::PathBuf};
 
 use crate::{
     request::{Method, Request},
-    response::response::ResponseCode,
+    response::ResponseCode,
     server::location::Location,
 };
 
@@ -198,7 +198,7 @@ pub mod utils {
 
     use crate::{
         request::{Method, Request},
-        response::response::{Response, ResponseCode},
+        response::{Response, ResponseCode},
     };
 
     pub async fn build_auto_index(dir: &PathBuf) -> io::Result<Response> {

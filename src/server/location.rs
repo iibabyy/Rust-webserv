@@ -2,15 +2,9 @@
 /*-------------------------[ LOCATIONS ]-------------------------*/
 /*---------------------------------------------------------------*/
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
-use crate::{request::Method, LocationBlock};
-
-use super::{
-    parsing,
-    server::Server,
-    traits::{config::Config, handler::Handler},
-};
+use super::*;
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -119,7 +113,9 @@ impl Location {
             match name.as_str() {
                 "root" => {
                     if new_location.root.is_some() {
-                        return Err("invalid field: root: root cannot be set with alias".to_string());
+                        return Err(
+                            "invalid field: root: root cannot be set with alias".to_string()
+                        );
                     }
 
                     let root = parsing::extract_root(infos);
@@ -136,7 +132,9 @@ impl Location {
                 }
                 "alias" => {
                     if new_location.root.is_some() {
-                        return Err("invalid field: alias: alias cannot be set with root".to_string());
+                        return Err(
+                            "invalid field: alias: alias cannot be set with root".to_string()
+                        );
                     } else {
                         new_location.alias = Some(parsing::extract_alias(infos)?)
                     }
@@ -245,17 +243,15 @@ impl Location {
                 "error_page" => {
                     let (pages, redirect) = parsing::extract_error_page(infos)?;
                     let hash = &mut new_location.error_pages;
-                    if pages.is_some() {
-                        pages
-                            .unwrap()
+                    if let Some(unwrapped_pages) = pages {
+                        unwrapped_pages
                             .iter()
                             .map(|(code, url)| hash.insert(code.to_owned(), url.to_owned()))
                             .last();
                     }
                     let hash = &mut new_location.error_redirect;
-                    if redirect.is_some() {
-                        redirect
-                            .unwrap()
+                    if let Some(unwrapped_redirect) = redirect {
+                        unwrapped_redirect
                             .iter()
                             .map(|(code, url)| hash.insert(code.to_owned(), url.to_owned()))
                             .last();

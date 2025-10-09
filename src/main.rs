@@ -7,7 +7,7 @@ mod utils;
 
 use crate::listener::Listener;
 use crate::parsing::*;
-use crate::server::server::Server;
+use crate::server::Server;
 use crate::utils::{get_args, listen_signals};
 
 use std::net::IpAddr;

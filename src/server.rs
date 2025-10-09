@@ -1,12 +1,12 @@
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
+pub mod location;
+pub mod parsing;
+pub mod traits;
 
 use crate::{request::Method, LocationBlock, ServerBlock};
+use location::Location;
+use traits::{config::Config, handler::Handler};
 
-use super::{
-    location::Location,
-    parsing,
-    traits::{config::Config, handler::Handler},
-};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 
 /*---------------------------------------------------------------*/
 /*-------------------------[ SERVER ]----------------------------*/
@@ -252,18 +252,18 @@ impl Server {
             }
             "error_page" => {
                 let (pages, redirect) = parsing::extract_error_page(infos)?;
+
                 let hash = &mut self.error_pages;
-                if pages.is_some() {
-                    pages
-                        .unwrap()
+                if let Some(unwrapped_pages) = pages {
+                    unwrapped_pages
                         .iter()
                         .map(|(code, url)| hash.insert(code.to_owned(), url.to_owned()))
                         .last();
                 }
+
                 let hash = &mut self.error_redirect;
-                if redirect.is_some() {
-                    redirect
-                        .unwrap()
+                if let Some(unwrapped_redirect) = redirect {
+                    unwrapped_redirect
                         .iter()
                         .map(|(code, url)| hash.insert(code.to_owned(), url.to_owned()))
                         .last();

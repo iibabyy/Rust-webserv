@@ -1,12 +1,13 @@
 use std::{collections::HashMap, io, path::PathBuf, slice::Iter};
 
-use crate::response::response::ResponseCode;
+use crate::response::ResponseCode;
 
 /*------------------------------------------------------------------------------------*/
 /*										REQUEST										  */
 /*------------------------------------------------------------------------------------*/
 
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct RequestError {
     invalid_request: bool,
     io_error: bool,
@@ -16,22 +17,22 @@ pub struct RequestError {
 
 impl From<io::Error> for RequestError {
     fn from(value: io::Error) -> Self {
-        let mut request = RequestError::default();
-        request.io_error = true;
-        request.io_error_kind = Some(value.kind());
-        request.error_string = value.to_string();
-
-        request
+        RequestError {
+            invalid_request: true,
+            error_string: value.to_string(),
+            io_error_kind: Some(value.kind()),
+            ..Default::default()
+        }
     }
 }
 
 impl From<String> for RequestError {
     fn from(value: String) -> Self {
-        let mut request = RequestError::default();
-        request.invalid_request = true;
-        request.error_string = value;
-
-        request
+        RequestError {
+            invalid_request: true,
+            error_string: value,
+            ..Default::default()
+        }
     }
 }
 
@@ -224,6 +225,7 @@ impl Request {
 /*------------------------------------------------------------------------------------*/
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Method {
     UNDEFINED,
     GET,
@@ -279,6 +281,23 @@ impl<'a> TryInto<&'a str> for Method {
     }
 }
 
+impl std::fmt::Display for Method {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Method::GET => write!(f, "GET"),
+            Method::POST => write!(f, "POST"),
+            Method::DELETE => write!(f, "DELETE"),
+            Method::HEAD => write!(f, "HEAD"),
+            Method::PUT => write!(f, "PUT"),
+            Method::CONNECT => write!(f, "CONNECT"),
+            Method::PATCH => write!(f, "PATCH"),
+            Method::TRACE => write!(f, "TRACE"),
+            Method::OPTIONS => write!(f, "OPTIONS"),
+            Method::UNDEFINED | Method::UNKNOWN => write!(f, "UNKNOWN"),
+        }
+    }
+}
+
 impl Method {
     pub fn try_from_str(method: &str) -> Result<Self, String> {
         match method {
@@ -292,21 +311,6 @@ impl Method {
             "PATCH" => Ok(Method::PATCH),
             "TRACE" => Ok(Method::TRACE),
             _ => Err("unknown method".to_string()),
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            Method::GET => "GET".to_owned(),
-            Method::POST => "POST".to_owned(),
-            Method::DELETE => "DELETE".to_owned(),
-            Method::HEAD => "HEAD".to_owned(),
-            Method::PUT => "PUT".to_owned(),
-            Method::CONNECT => "CONNECT".to_owned(),
-            Method::PATCH => "PATCH".to_owned(),
-            Method::TRACE => "TRACE".to_owned(),
-            Method::OPTIONS => "OPTIONS".to_owned(),
-            Method::UNDEFINED | Method::UNKNOWN => "UNKNOWN".to_owned(),
         }
     }
 }

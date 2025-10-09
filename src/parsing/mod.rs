@@ -45,20 +45,14 @@ impl ServerBlock {
     pub fn get(&self, name: String) -> Vec<String> {
         let value = self.directives.get(&name);
 
-        if value.is_some() {
-            value.unwrap().clone()
+        if let Some(directive) = value {
+            directive.clone()
         } else {
             vec![]
         }
     }
 
     pub fn get_location(&self, path: String) -> Option<LocationBlock> {
-        let value = self.locations.get(&path);
-
-        if value.is_some() {
-            Some((*value.unwrap()).clone())
-        } else {
-            None
-        }
+        self.locations.get(&path).cloned()
     }
 }

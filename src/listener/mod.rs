@@ -13,9 +13,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     request::{Method, Request},
-    response::response::{Response, ResponseCode},
+    response::{Response, ResponseCode},
     server::{
-        server::Server,
         traits::{
             config::{
                 utils::{self},
@@ -23,6 +22,7 @@ use crate::{
             },
             handler::Handler,
         },
+        Server,
     },
 };
 
@@ -138,7 +138,7 @@ impl Listener {
                 {
                     Some(raw_left) => raw_left,
                     None => {
-                        let _ = stream.shutdown();
+                        let _ = stream.shutdown().await;
                         return Ok(());
                     }
                 }
@@ -205,11 +205,7 @@ impl Listener {
             }
         }
 
-        if default.is_some() {
-            return default.unwrap();
-        }
-
-        servers.first().unwrap()
+        default.unwrap_or(servers.first().unwrap())
     }
 }
 

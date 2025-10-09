@@ -3,7 +3,6 @@ use std::{
     collections::HashMap,
     io::{Error, ErrorKind},
     path::PathBuf,
-    usize,
 };
 
 use lazy_static::lazy_static;
@@ -80,14 +79,16 @@ impl Response {
             stream.write_all(self.content.as_bytes()).await?
         }
 
-        stream.write_all(&mut [b'\r', b'\n']).await?;
+        stream.write_all(b"/r/n").await?;
         Ok(())
     }
 
     fn body_allowed(&self) -> bool {
         if self.code.code == 204 || self.code.code == 304 {
             false
-        } else { self.request_method != Method::HEAD }
+        } else {
+            self.request_method != Method::HEAD
+        }
     }
 
     async fn serialize_header(&mut self) -> String {
@@ -180,7 +181,6 @@ impl Default for ResponseCode {
     }
 }
 
-#[allow(dead_code)]
 impl ResponseCode {
     pub fn new(code: u16, msg: &str) -> ResponseCode {
         ResponseCode {
@@ -227,13 +227,6 @@ impl ResponseCode {
         }
     }
 
-    pub fn into_error(&self) -> ErrorKind {
-        match self.code {
-            404 => ErrorKind::NotFound, // Not Found
-            _ => ErrorKind::Other,      // Default to Internal Server Error
-        }
-    }
-
     pub fn to_string(&self) -> &String {
         &self.msg
     }
@@ -242,22 +235,31 @@ impl ResponseCode {
         self.code
     }
 
-    fn set_code(&mut self, code: u16) {
-        self.code = code;
-    }
+    // Unused methods //
 
-    pub fn msg(&self) -> &str {
-        &self.msg
-    }
+    // pub fn error(&self) -> ErrorKind {
+    //     match self.code {
+    //         404 => ErrorKind::NotFound, // Not Found
+    //         _ => ErrorKind::Other,      // Default to Internal Server Error
+    //     }
+    // }
 
-    pub fn set_redirect(&mut self, redirect: PathBuf) -> &mut Self {
-        self.redirect = Some(redirect);
-        self
-    }
+    // fn set_code(&mut self, code: u16) {
+    //     self.code = code;
+    // }
 
-    pub fn redirect(&self) -> Option<&PathBuf> {
-        self.redirect.as_ref()
-    }
+    // pub fn msg(&self) -> &str {
+    //     &self.msg
+    // }
+
+    // pub fn set_redirect(&mut self, redirect: PathBuf) -> &mut Self {
+    //     self.redirect = Some(redirect);
+    //     self
+    // }
+
+    // pub fn redirect(&self) -> Option<&PathBuf> {
+    //     self.redirect.as_ref()
+    // }
 }
 
 lazy_static! {

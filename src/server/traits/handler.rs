@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     io::{self, ErrorKind},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Output, Stdio},
 };
 
@@ -16,7 +16,7 @@ use tokio::{
 use crate::{
     listener::send_error_response,
     request::{Method, Request},
-    response::response::{Response, ResponseCode},
+    response::{Response, ResponseCode},
 };
 
 use super::config::{
@@ -50,8 +50,6 @@ pub trait Handler: Config {
                 };
             }
         }
-
-        
 
         if self.is_cgi(&request) {
             self.handle_cgi(&request, stream, raw_left, buffer).await
@@ -133,8 +131,7 @@ pub trait Handler: Config {
                     request.path().display()
                 );
                 send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-                if request.keep_connection_alive() && err.kind() != ErrorKind::UnexpectedEof
-                {
+                if request.keep_connection_alive() && err.kind() != ErrorKind::UnexpectedEof {
                     return Some(raw_left.to_owned());
                 } else {
                     return None;
@@ -147,8 +144,7 @@ pub trait Handler: Config {
             Err(err) => {
                 println!("Error: sending response: {err}");
                 send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-                if request.keep_connection_alive() && err.kind() != ErrorKind::UnexpectedEof
-                {
+                if request.keep_connection_alive() && err.kind() != ErrorKind::UnexpectedEof {
                     return Some(raw_left.to_owned());
                 } else {
                     return None;
@@ -195,12 +191,18 @@ pub trait Handler: Config {
 
     async fn handle_delete(&self, request: &Request) -> Result<(), io::Error> {
         if !request.path().exists() {
-            return Err(io::Error::new(ErrorKind::NotFound, "file not found"));
+            Err(io::Error::new(
+                ErrorKind::NotFound,
+                format!("{} not found", request.path().display()),
+            ))
         } else if request.path().is_dir() {
-            return Err(io::Error::new(ErrorKind::NotFound, "file not found"));
+            Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                format!("{} is a directory", request.path().display()),
+            ))
+        } else {
+            tokio::fs::remove_file(request.path()).await
         }
-
-        tokio::fs::remove_file(request.path()).await
     }
 
     /*------------------------------------------------------------*/
@@ -231,8 +233,6 @@ pub trait Handler: Config {
             ));
         }
 
-        
-
         match utils::choose_upload_type(request) {
             UploadType::Multipart => {
                 self.handle_mutlipart_upload(request, stream, raw_left, upload_folder, buffer)
@@ -254,7 +254,7 @@ pub trait Handler: Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &[u8],
-        upload_folder: &PathBuf,
+        upload_folder: &Path,
         buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         let boundary = match utils::extract_boundary(request.content_type()) {
@@ -283,7 +283,7 @@ pub trait Handler: Config {
         content_len: usize,
         raw_left: &[u8],
         boundary: String,
-        upload_folder: &PathBuf,
+        upload_folder: &Path,
         buffer: &mut [u8; 8196],
     ) -> io::Result<Vec<u8>> {
         let mut readed = 0;
@@ -358,7 +358,7 @@ pub trait Handler: Config {
         file: MultipartFile,
         raw_left: Vec<u8>,
         stream: &mut TcpStream,
-        upload_folder: &PathBuf,
+        upload_folder: &Path,
         boundary: &[u8],
         buffer: &mut [u8; 8196],
     ) -> io::Result<(Vec<u8>, usize)> {
@@ -446,10 +446,10 @@ pub trait Handler: Config {
         let mut content_disposition = None;
 
         for header in headers.split("\r\n") {
-            if header.starts_with("Content-Type: ") {
-                content_type = Some(header["Content-Type: ".len()..].to_string());
-            } else if header.starts_with("Content-Disposition") {
-                content_disposition = Some(header["Content-Disposition".len()..].to_string());
+            if let Some(value) = header.strip_prefix("Content-Type: ") {
+                content_type = Some(value.to_string());
+            } else if let Some(value) = header.strip_prefix("Content-Disposition") {
+                content_disposition = Some(value.to_string());
             }
         }
 
@@ -543,7 +543,7 @@ pub trait Handler: Config {
         request: &Request,
         stream: &mut TcpStream,
         raw_left: &[u8],
-        upload_folder: &PathBuf,
+        upload_folder: &Path,
         buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
         let file = format!("{}/default_upload", upload_folder.to_string_lossy());
