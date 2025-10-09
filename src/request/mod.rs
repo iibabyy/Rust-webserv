@@ -164,7 +164,7 @@ impl Request {
         let split: Vec<&str> = line.split_whitespace().collect();
 
         if split.len() != 3 {
-            return Err(format!("invalid header: first line invalid"));
+            return Err("invalid header: first line invalid".to_string());
         } // Bad Request
 
         let method = split[0];

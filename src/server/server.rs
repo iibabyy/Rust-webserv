@@ -165,7 +165,7 @@ impl Server {
         }
 
         for (port, vec) in &map {
-            if vec.iter().filter(|serv| serv.default == true).count() > 1 {
+            if vec.iter().filter(|serv| serv.default).count() > 1 {
                 return Err(format!("port {port}: multiple default servers"));
             }
         }
@@ -192,16 +192,14 @@ impl Server {
                 self.root = Some(parsing::extract_root(infos)?)
             }
             "alias" => {
-                return Err(format!(
-                    "invalid field: alias: alias can only be set in locations"
-                ));
+                return Err("invalid field: alias: alias can only be set in locations".to_string());
             }
             "upload_folder" => self.upload_folder = Some(parsing::extract_upload_folder(infos)?),
             "listen" => {
                 (self.port, self.default) = parsing::extract_listen(infos)?;
             }
             "server_name" | "server_names" => {
-                if infos.len() < 1 {
+                if infos.is_empty() {
                     return Err("invalid field: server_name".to_owned());
                 } else {
                     if self.name.is_none() {
@@ -225,7 +223,7 @@ impl Server {
                 self.cgi.insert(extension, path);
             }
             "allowed_methods" => {
-                if infos.len() < 1 {
+                if infos.is_empty() {
                     return Err("invalid field: allowed_methods".to_owned());
                 }
 
@@ -236,7 +234,7 @@ impl Server {
                     .collect();
 
                 if methods.iter().any(|res| res.is_err()) {
-                    return Err(format!("invalid field: allowed_methods: unknown method"));
+                    return Err("invalid field: allowed_methods: unknown method".to_string());
                 }
 
                 if self.methods.is_none() {
@@ -282,7 +280,7 @@ impl Server {
     }
 
     fn add_location(&mut self, location: LocationBlock) -> Result<(), String> {
-        let new_location = Location::new(location, &self)?;
+        let new_location = Location::new(location, self)?;
 
         self.locations
             .insert(new_location.path().clone(), new_location);

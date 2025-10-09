@@ -119,9 +119,7 @@ impl Location {
             match name.as_str() {
                 "root" => {
                     if new_location.root.is_some() {
-                        return Err(format!(
-                            "invalid field: root: root cannot be set with alias"
-                        ));
+                        return Err("invalid field: root: root cannot be set with alias".to_string());
                     }
 
                     let root = parsing::extract_root(infos);
@@ -138,9 +136,7 @@ impl Location {
                 }
                 "alias" => {
                     if new_location.root.is_some() {
-                        return Err(format!(
-                            "invalid field: alias: alias cannot be set with root"
-                        ));
+                        return Err("invalid field: alias: alias cannot be set with root".to_string());
                     } else {
                         new_location.alias = Some(parsing::extract_alias(infos)?)
                     }
@@ -205,7 +201,7 @@ impl Location {
                     }
                 }
                 "allowed_methods" => {
-                    if infos.len() < 1 {
+                    if infos.is_empty() {
                         return Err(format!(
                             "location ({}) : invalid field: allowed_methods",
                             new_location.path.display()
@@ -273,7 +269,7 @@ impl Location {
 
         new_location.complete_with_server_directives(server);
 
-        if new_location.none_cgi == true {
+        if new_location.none_cgi {
             new_location.cgi.clear();
         }
         if new_location.upload_folder.is_some() && new_location.root.is_some() {
@@ -306,7 +302,7 @@ impl Location {
             self.index = Some(server.index().unwrap().clone());
         }
         if self.max_body_size.is_none() && server.max_body_size().is_some() {
-            self.max_body_size = Some(server.max_body_size().unwrap().clone());
+            self.max_body_size = Some(*server.max_body_size().unwrap());
         }
         if self.return_.is_none() && server.return_().is_some() {
             self.return_ = Some(server.return_().unwrap().clone());

@@ -60,9 +60,9 @@ pub trait Config {
         let path = request.path();
         let path_str = request.path().to_string_lossy();
 
-        if path.is_file() == true {
-            return Ok(());
-        } else if path.is_dir() == true {
+        if path.is_file() {
+            Ok(())
+        } else if path.is_dir() {
             match self.format_dir_path(path_str) {
                 Ok(Some(path)) => request.set_path(path),
                 Ok(None) => (),
@@ -84,7 +84,7 @@ pub trait Config {
             }
         }
 
-        if self.auto_index() == false {
+        if !self.auto_index() {
             return Err(ResponseCode::from_code(403));
         }
 
@@ -96,7 +96,7 @@ pub trait Config {
             let path = request.path().to_string_lossy();
             let path = path.replacen(
                 &self.path().to_string_lossy().to_string(),
-                &self.alias().unwrap().to_string_lossy().to_string(),
+                self.alias().unwrap().to_string_lossy().as_ref(),
                 1,
             );
 
@@ -114,7 +114,7 @@ pub trait Config {
             return Err(ResponseCode::from_code(404));
         }; // no root nor alias
 
-        if path.is_dir() && path.to_string_lossy().ends_with("/") == false {
+        if path.is_dir() && !path.to_string_lossy().ends_with("/") {
             let redirect = PathBuf::from(format!("{}/", request.path().to_string_lossy()));
             let response = ResponseCode::new_redirect(301, "Moved Premanently", redirect);
             return Err(response);
@@ -133,17 +133,15 @@ pub trait Config {
             return Err(ResponseCode::from_code(405));
         } // Ok
 
-        return match request.method() {
+        match request.method() {
             // check if implemented (wip)
             &Method::UNKNOWN | &Method::UNDEFINED => Err(ResponseCode::from_code(501)), // Not allowed
             _ => Ok(()),
-        };
+        }
     }
 
     fn get_request_location<'a>(&'a self, request: &Request) -> Option<&'a Location> {
-        if self.locations().is_none() {
-            return None;
-        }
+        self.locations()?;
 
         let locations = self.locations().unwrap();
         let mut save: Option<&Location> = None;
@@ -307,7 +305,7 @@ pub mod utils {
 
         let mut color_index: usize = 2;
         for file_name in files {
-            let color_class = format!("color-{}", color_index.to_string());
+            let color_class = format!("color-{}", color_index);
             color_index = (color_index % 5) + 1;
 
             html.push_str(&format!(
@@ -388,24 +386,22 @@ pub mod utils {
             let end = n - read_too_much;
 
             stdin.write_all(&buffer[..end]).await?;
-            return Ok(buffer[end..end + read_too_much].to_vec());
+            Ok(buffer[end..end + read_too_much].to_vec())
         } else {
-            return Err(io::Error::new(
+            Err(io::Error::new(
                 ErrorKind::BrokenPipe,
                 "failed to establish connection with CGI's pipe",
-            ));
+            ))
         }
     }
 
     pub fn extract_boundary(content_type: Option<&String>) -> Option<String> {
         let to_find = "boundary=";
 
-        if content_type.is_none() {
-            return None;
-        }
+        content_type?;
 
         let content_type = content_type.unwrap();
-        if content_type.contains(to_find) == false {
+        if !content_type.contains(to_find) {
             return None;
         }
 
@@ -415,9 +411,9 @@ pub mod utils {
         }
 
         let mut boundary = content_type[boundary_pos..].split_whitespace();
-        let boundary = boundary.nth(0)?;
+        let boundary = boundary.next()?;
 
-        return Some(format!("--{boundary}"));
+        Some(format!("--{boundary}"))
     }
 
     pub async fn consume_body(
@@ -426,7 +422,7 @@ pub mod utils {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
-        let content_length = request.content_length().unwrap().to_owned() as usize;
+        let content_length = request.content_length().unwrap().to_owned();
 
         if raw_left.len() >= content_length {
             return Ok(raw_left[content_length..].to_vec());
@@ -456,7 +452,7 @@ pub mod utils {
         let read_too_much = read - len;
         let end = n - read_too_much;
 
-        return Ok(buffer[end..end + read_too_much].to_vec());
+        Ok(buffer[end..end + read_too_much].to_vec())
     }
 
     pub enum UploadType {
@@ -474,9 +470,9 @@ pub mod utils {
         let content_type = content_type.unwrap();
 
         if content_type.contains("multipart/form-data") {
-            return UploadType::Multipart;
+            UploadType::Multipart
         } else {
-            return UploadType::Normal;
+            UploadType::Normal
         }
     }
 

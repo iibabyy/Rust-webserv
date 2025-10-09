@@ -181,7 +181,7 @@ impl Listener {
                 .await
         };
 
-        return raw_left;
+        raw_left
     }
 
     fn choose_server_from<'a>(request: &Request, servers: &'a Vec<Server>) -> &'a Server {
@@ -209,7 +209,7 @@ impl Listener {
             return default.unwrap();
         }
 
-        return servers.first().unwrap();
+        servers.first().unwrap()
     }
 }
 

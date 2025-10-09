@@ -8,6 +8,7 @@ pub mod traits;
 
 pub mod parsing {
     use std::{collections::HashMap, path::PathBuf};
+    
 
     pub fn extract_root(value: Vec<String>) -> Result<PathBuf, String> {
         if value.len() != 1 {
@@ -26,7 +27,7 @@ pub mod parsing {
 
         let path = PathBuf::from(&value[0]);
 
-        if path.to_string_lossy().chars().last() != Some('/') {
+        if !path.to_string_lossy().ends_with('/') {
             return Err(value[0].clone() + ": alias must ends with '/'");
         }
 
@@ -40,12 +41,12 @@ pub mod parsing {
 
         let path = PathBuf::from(&value[0]);
 
-        if path.exists() == false {
+        if !path.exists() {
             match std::fs::create_dir_all(&path) {
                 Ok(_) => (),
                 Err(err) => return Err(format!("failed to create upload folder: {err}")),
             }
-        } else if path.is_dir() == false {
+        } else if !path.is_dir() {
             return Err(format!("invalid upload folder: {}", value[0]));
         }
 
@@ -59,10 +60,10 @@ pub mod parsing {
 
         let num = value[0].parse::<usize>();
 
-        return match num {
+        match num {
             Ok(num) => Ok(num),
             Err(e) => Err(format!("invalid field: client_max_body_size: {e}")),
-        };
+        }
     }
 
     pub fn extract_error_page(
@@ -75,7 +76,7 @@ pub mod parsing {
         String,
     > {
         if value.is_empty() {
-            return Err(format!("invalid field: error_page: empty"));
+            return Err("invalid field: error_page: empty".to_string());
         }
 
         let mut pages = HashMap::new();
@@ -137,7 +138,7 @@ pub mod parsing {
     }
 
     pub fn extract_return(value: Vec<String>) -> Result<(u16, Option<String>), String> {
-        if value.len() < 1 || value.len() > 2 {
+        if value.is_empty() || value.len() > 2 {
             return Err("invalid field: return".to_owned());
         }
 
@@ -165,7 +166,7 @@ pub mod parsing {
     }
 
     pub fn extract_listen(value: Vec<String>) -> Result<(Option<u16>, bool), String> {
-        if value.len() < 1 || value.len() > 2 {
+        if value.is_empty() || value.len() > 2 {
             return Err("invalid field: port".to_owned());
         }
 
@@ -173,10 +174,10 @@ pub mod parsing {
 
         let port = value[0].parse::<u16>();
 
-        return match port {
+        match port {
             Ok(num) => Ok((Some(num), default)),
             Err(err) => Err(format!("invalid field: port: {}", err)),
-        };
+        }
     }
 
     pub fn extract_index(value: Vec<String>) -> Result<String, String> {
@@ -211,7 +212,7 @@ pub mod parsing {
         let extension = extension.trim_start_matches(".").to_string();
         let path = PathBuf::from(&value[1]);
 
-        if path.is_file() == false {
+        if !path.is_file() {
             return Err(format!("invalid field: cgi: invalid path: {}", value[1]));
         }
         Ok((extension, path))

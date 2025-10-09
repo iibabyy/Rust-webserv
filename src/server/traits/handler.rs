@@ -43,7 +43,7 @@ pub trait Handler: Config {
             Err(err) => {
                 eprintln!("Error: parsing request: {}", err.to_string());
                 send_error_response(stream, err, buffer).await;
-                return if request.keep_connection_alive() == true {
+                return if request.keep_connection_alive() {
                     Some(raw_left.to_vec())
                 } else {
                     None
@@ -51,14 +51,14 @@ pub trait Handler: Config {
             }
         }
 
-        let raw_left = if self.is_cgi(&request) {
+        
+
+        if self.is_cgi(&request) {
             self.handle_cgi(&request, stream, raw_left, buffer).await
         } else {
             self.handle_non_cgi(&request, stream, raw_left, buffer)
                 .await
-        };
-
-        return raw_left;
+        }
     }
 
     async fn handle_non_cgi(
@@ -68,11 +68,11 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
-        match self.handle_request_method(&request).await {
+        match self.handle_request_method(request).await {
             Ok(()) => (),
             Err(err) => {
                 eprintln!("Error: {err}");
-                match utils::consume_body(&request, stream, raw_left, buffer).await {
+                match utils::consume_body(request, stream, raw_left, buffer).await {
                     Ok(raw_left) => return Some(raw_left),
                     Err(err) => {
                         eprintln!("Error: {err}");
@@ -83,7 +83,7 @@ pub trait Handler: Config {
         }
 
         let raw_left = match self
-            .handle_request_body(&request, stream, raw_left, buffer)
+            .handle_request_body(request, stream, raw_left, buffer)
             .await
         {
             Ok(raw_left) => raw_left,
@@ -92,7 +92,7 @@ pub trait Handler: Config {
                     ErrorKind::UnexpectedEof => return None, // end of stream
 
                     _ => {
-                        println!("Error: handling body: {}", err.to_string());
+                        println!("Error: handling body: {}", err);
                         send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
                         return None; // kill stream
                     }
@@ -100,7 +100,7 @@ pub trait Handler: Config {
             }
         };
 
-        match self.send_response(stream, &request, buffer).await {
+        match self.send_response(stream, request, buffer).await {
             Ok(_) => (),
             Err(err) => {
                 println!("Error: sending response: {err}");
@@ -111,10 +111,10 @@ pub trait Handler: Config {
             }
         }
 
-        if request.keep_connection_alive() == true {
-            return Some(raw_left);
+        if request.keep_connection_alive() {
+            Some(raw_left)
         } else {
-            return None;
+            None
         }
     }
 
@@ -133,7 +133,7 @@ pub trait Handler: Config {
                     request.path().display()
                 );
                 send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-                if request.keep_connection_alive() == true && err.kind() != ErrorKind::UnexpectedEof
+                if request.keep_connection_alive() && err.kind() != ErrorKind::UnexpectedEof
                 {
                     return Some(raw_left.to_owned());
                 } else {
@@ -147,7 +147,7 @@ pub trait Handler: Config {
             Err(err) => {
                 println!("Error: sending response: {err}");
                 send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-                if request.keep_connection_alive() == true && err.kind() != ErrorKind::UnexpectedEof
+                if request.keep_connection_alive() && err.kind() != ErrorKind::UnexpectedEof
                 {
                     return Some(raw_left.to_owned());
                 } else {
@@ -194,7 +194,7 @@ pub trait Handler: Config {
     }
 
     async fn handle_delete(&self, request: &Request) -> Result<(), io::Error> {
-        if request.path().exists() == false {
+        if !request.path().exists() {
             return Err(io::Error::new(ErrorKind::NotFound, "file not found"));
         } else if request.path().is_dir() {
             return Err(io::Error::new(ErrorKind::NotFound, "file not found"));
@@ -223,7 +223,7 @@ pub trait Handler: Config {
 
         let upload_folder = self.upload_folder().unwrap();
 
-        if upload_folder.exists() == false {
+        if !upload_folder.exists() {
             eprintln!("no upload folder");
             return Err(io::Error::new(
                 ErrorKind::NotFound,
@@ -231,7 +231,9 @@ pub trait Handler: Config {
             ));
         }
 
-        let res = match utils::choose_upload_type(request) {
+        
+
+        match utils::choose_upload_type(request) {
             UploadType::Multipart => {
                 self.handle_mutlipart_upload(request, stream, raw_left, upload_folder, buffer)
                     .await
@@ -240,9 +242,7 @@ pub trait Handler: Config {
                 self.upload_default_content(request, stream, raw_left, upload_folder, buffer)
                     .await
             }
-        };
-
-        return res;
+        }
     }
 
     /*------------------------------------------------------------*/
@@ -269,7 +269,7 @@ pub trait Handler: Config {
 
         Self::upload_multipart_content(
             stream,
-            request.content_length().unwrap().clone(),
+            *request.content_length().unwrap(),
             raw_left,
             boundary,
             upload_folder,
@@ -369,7 +369,7 @@ pub trait Handler: Config {
             .truncate(true)
             .open(PathBuf::from(format!(
                 "{}/{}",
-                upload_folder.to_string_lossy().to_string(),
+                upload_folder.to_string_lossy(),
                 file.filename
             )))
             .await?;
@@ -473,20 +473,20 @@ pub trait Handler: Config {
             &content_disposition[filename_index..]
         };
 
-        if filename.starts_with("\"") == false || filename.ends_with("\"") == false {
+        if !filename.starts_with("\"") || !filename.ends_with("\"") {
             return Err(io::Error::new(ErrorKind::InvalidData, "invalid filename"));
         }
 
         let filename = filename[1..filename.len() - 1].to_string();
 
-        return Ok((
+        Ok((
             MultipartFile {
                 filename,
                 content_type,
             },
             raw_left,
             readed,
-        ));
+        ))
     }
 
     async fn read_until_find(
@@ -574,7 +574,7 @@ pub trait Handler: Config {
     ) -> Result<Vec<u8>, io::Error> {
         let mut read = 0;
         let mut n;
-        let body_len = request.content_length().unwrap().clone();
+        let body_len = *request.content_length().unwrap();
 
         if body_len <= raw_left.len() {
             file.write_all(&raw_left[..body_len]).await?;
@@ -611,10 +611,10 @@ pub trait Handler: Config {
             return utils::build_auto_index(request.path()).await;
         }
 
-        match request.method() {
-            &Method::GET => return self.build_get_response(request).await,
-            &Method::POST => return self.build_get_response(request).await,
-            _ => return Err(io::Error::new(ErrorKind::Other, "method not implemented")), // not implemented
+        match *request.method() {
+            Method::GET => return self.build_get_response(request).await,
+            Method::POST => return self.build_get_response(request).await,
+            _ => Err(io::Error::new(ErrorKind::Other, "method not implemented")), // not implemented
         }
     }
 
@@ -671,7 +671,7 @@ pub trait Handler: Config {
             None => return false,
         };
 
-        return self.cgi().contains_key(&extension);
+        self.cgi().contains_key(&extension)
     }
 
     async fn execute_cgi(
@@ -681,7 +681,7 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Result<(Output, Vec<u8>), io::Error> {
-        if request.path().is_file() == false {
+        if !request.path().is_file() {
             return Err(io::Error::new(
                 ErrorKind::NotFound,
                 "CGI failure: not found",
@@ -707,7 +707,7 @@ pub trait Handler: Config {
 
         let output = child.wait_with_output().await?;
 
-        if output.status.success() == false {
+        if !output.status.success() {
             return Err(io::Error::new(
                 ErrorKind::Other,
                 format!("CGI failure: program exited with status {}", output.status),
@@ -723,7 +723,7 @@ pub trait Handler: Config {
         env.insert("REQUEST_METHOD".to_owned(), request.method().to_string());
         env.insert(
             "HTTP_CONNECTION".to_owned(),
-            if request.keep_connection_alive() == true {
+            if request.keep_connection_alive() {
                 "keep-alive"
             } else {
                 "close "

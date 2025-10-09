@@ -28,7 +28,7 @@ fn modifier(input: &str) -> IResult<&str, &str> {
 
 // Identifiant : chaîne alphanumérique avec symboles autorisés
 fn identifier(input: &str) -> IResult<&str, &str> {
-    take_while(|c: char| c.is_ascii_whitespace() == false && c != ';')(input)
+    take_while(|c: char| !c.is_ascii_whitespace() && c != ';')(input)
 }
 
 // Espaces blancs optionnels
@@ -42,7 +42,7 @@ fn space(input: &str) -> IResult<&str, &str> {
 }
 
 fn has_values(identifiant: &str) -> bool {
-    return identifiant != "internal";
+    identifiant != "internal"
 }
 
 // Directive avec un identifiant et des espaces blancs entre l'identifiant et les valeurs
@@ -61,7 +61,7 @@ fn directive(mut input: &str) -> IResult<&str, (String, Vec<String>)> {
             id.to_owned(),
             values
                 .iter()
-                .filter(|str| str.is_empty() == false)
+                .filter(|str| !str.is_empty())
                 .map(|str| str.to_string())
                 .collect(),
         ),
@@ -94,7 +94,7 @@ fn block(input: &str) -> IResult<&str, ServerBlock> {
     let mut input = skip_whitespaces(input);
 
     let mut found = true;
-    while found == true {
+    while found {
         found = false;
         input = match directive(input) {
             Ok((new_input, directive)) => {
@@ -144,9 +144,9 @@ fn block(input: &str) -> IResult<&str, ServerBlock> {
     Ok((
         input,
         ServerBlock {
-            locations: locations,
-            directives: directives,
-            cgi: cgi,
+            locations,
+            directives,
+            cgi,
         },
     ))
 }
@@ -195,10 +195,10 @@ fn location_block(mut input: &str) -> IResult<&str, LocationBlock> {
     Ok((
         input,
         LocationBlock {
-            modifier: modifier,
+            modifier,
             path: path.to_owned(),
             directives: infos,
-            cgi: cgi,
+            cgi,
         },
     ))
 }
@@ -208,7 +208,7 @@ pub fn config(input: &str) -> IResult<&str, Vec<ServerBlock>> {
     let (input, servs) = many0(block)(input)?;
 
     let input = skip_whitespaces(input);
-    if input.is_empty() == false {
+    if !input.is_empty() {
         Err(nom::Err::Error(nom::error::Error::new(
             "File not entirely readed",
             nom::error::ErrorKind::Fail,

@@ -77,7 +77,7 @@ impl Response {
                 stream.write_all(&buffer[..n]).await?;
             }
         } else {
-            stream.write_all(&mut self.content.as_bytes()).await?
+            stream.write_all(self.content.as_bytes()).await?
         }
 
         stream.write_all(&mut [b'\r', b'\n']).await?;
@@ -85,13 +85,9 @@ impl Response {
     }
 
     fn body_allowed(&self) -> bool {
-        return if self.code.code == 204 || self.code.code == 304 {
+        if self.code.code == 204 || self.code.code == 304 {
             false
-        } else if self.request_method == Method::HEAD {
-            false
-        } else {
-            true
-        };
+        } else { self.request_method != Method::HEAD }
     }
 
     async fn serialize_header(&mut self) -> String {
@@ -107,7 +103,7 @@ impl Response {
             self.content.len()
         };
 
-        if self.body_allowed() == true {
+        if self.body_allowed() {
             self.headers
                 .insert("Content-Length".to_owned(), body_len.to_string());
         }
@@ -119,7 +115,7 @@ impl Response {
             .collect::<Vec<String>>()
             .join("\r\n");
 
-        if headers.is_empty() == false {
+        if !headers.is_empty() {
             headers.push_str("\r\n");
         }
 
