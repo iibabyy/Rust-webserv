@@ -57,7 +57,7 @@ pub trait Config {
     }
 
     fn add_index_if_needed(&self, request: &mut Request) -> Result<(), ResponseCode> {
-        let path = request.path();
+        let path = request.path().as_path();
         let path_str = request.path().to_string_lossy();
 
         if path.is_file() {

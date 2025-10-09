@@ -36,18 +36,7 @@ pub fn extract_upload_folder(value: Vec<String>) -> Result<PathBuf, String> {
         return Err("invalid field: upload_folder".to_owned());
     }
 
-    let path = PathBuf::from(&value[0]);
-
-    if !path.exists() {
-        match std::fs::create_dir_all(&path) {
-            Ok(_) => (),
-            Err(err) => return Err(format!("failed to create upload folder: {err}")),
-        }
-    } else if !path.is_dir() {
-        return Err(format!("invalid upload folder: {}", value[0]));
-    }
-
-    Ok(path)
+    Ok(PathBuf::from(&value[0]))
 }
 
 pub fn extract_max_body_size(value: Vec<String>) -> Result<usize, String> {

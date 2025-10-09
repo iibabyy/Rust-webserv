@@ -20,7 +20,7 @@ pub struct CliArgs {
     /// Configuration file
     pub file: Option<String>,
 
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long, default_value_t = false)]
     pub test: bool,
 }
 

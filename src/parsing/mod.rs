@@ -24,7 +24,7 @@ pub struct ServerBlock {
 pub async fn handle_parsing(args: &Args) -> anyhow::Result<HashMap<u16, Vec<Server>>> {
     let config = get_config(&args.config_file)
         .await
-        .map_err(|err| anyhow::anyhow!("Error: parsing: {err}"))?;
+        .map_err(|err| anyhow::anyhow!(err))?;
 
     let servers =
         Server::init_servers(config).map_err(|err| anyhow::anyhow!("Error: parsing: {err}"))?;

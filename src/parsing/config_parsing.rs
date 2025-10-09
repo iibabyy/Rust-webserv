@@ -11,8 +11,8 @@ use nom::{
     IResult,
 };
 
-use super::ServerBlock;
 use crate::parsing::LocationBlock;
+use super::ServerBlock;
 
 // Définition des symboles autorisés dans les identifiants
 #[allow(unused)]

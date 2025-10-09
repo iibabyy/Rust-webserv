@@ -181,23 +181,6 @@ impl Location {
                         Ok(max_size) => new_location.max_body_size = Some(max_size),
                     }
                 }
-                "cgi" => {
-                    if infos.len() == 1 && infos[1] == "none" {
-                        new_location.none_cgi = true;
-                    } else {
-                        let (extension, path) = match parsing::extract_cgi(infos) {
-                            Err(e) => {
-                                return Err(format!(
-                                    "location ({}) : {}",
-                                    new_location.path.display(),
-                                    e
-                                ))
-                            }
-                            Ok(cgi) => cgi,
-                        };
-                        new_location.cgi.insert(extension, path);
-                    }
-                }
                 "allowed_methods" => {
                     if infos.is_empty() {
                         return Err(format!(
@@ -263,11 +246,10 @@ impl Location {
             }
         }
 
+        new_location.cgi = location.cgi;
+
         new_location.complete_with_server_directives(server);
 
-        if new_location.none_cgi {
-            new_location.cgi.clear();
-        }
         if new_location.upload_folder.is_some() && new_location.root.is_some() {
             Self::add_root_to_upload_folder(&mut new_location);
         }
@@ -279,7 +261,7 @@ impl Location {
         let upload_folder = location.upload_folder.as_ref().unwrap().to_string_lossy();
         let root = location.root.as_ref().unwrap().to_string_lossy();
 
-        let upload_folder = PathBuf::from(format!("{upload_folder}/{root}"));
+        let upload_folder = PathBuf::from(format!("{root}/{upload_folder}"));
 
         location.upload_folder = Some(upload_folder);
     }

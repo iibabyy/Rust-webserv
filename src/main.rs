@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // -t/--test -> user only want to check the config file
     if args.test {
-        eprintln!("---[ Parsing Fini ]---");
+        eprintln!("---[ Config file Ok ! ]---");
         return Ok(());
     }
 

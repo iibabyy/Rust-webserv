@@ -3,6 +3,7 @@ use std::{
     io::{self, ErrorKind},
     path::{Path, PathBuf},
     process::{Output, Stdio},
+    time::Duration,
 };
 
 use nom::{AsBytes, FindSubstring};
@@ -41,7 +42,6 @@ pub trait Handler: Config {
         match self.parse_request(&mut request) {
             Ok(location) => location,
             Err(err) => {
-                eprintln!("Error: parsing request: {}", err.to_string());
                 send_error_response(stream, err, buffer).await;
                 return if request.keep_connection_alive() {
                     Some(raw_left.to_vec())
@@ -218,15 +218,19 @@ pub trait Handler: Config {
     ) -> Result<Vec<u8>, io::Error> {
         if request.content_length().is_none() {
             return Ok(raw_left.to_vec());
-        } else if self.upload_folder().is_none() {
-            eprintln!("no upload folder");
-            return Err(io::Error::new(ErrorKind::NotFound, "No upload folder"));
+        }
+
+        if self.upload_folder().is_none() {
+            return Err(io::Error::new(
+                ErrorKind::NotFound,
+                "Upload folder is missing in configuration",
+            ));
         }
 
         let upload_folder = self.upload_folder().unwrap();
 
         if !upload_folder.exists() {
-            eprintln!("no upload folder");
+            eprintln!("Upload folder not found ({})", upload_folder.display());
             return Err(io::Error::new(
                 ErrorKind::NotFound,
                 "Upload folder not found",
@@ -612,8 +616,9 @@ pub trait Handler: Config {
         }
 
         match *request.method() {
-            Method::GET => return self.build_get_response(request).await,
-            Method::POST => return self.build_get_response(request).await,
+            Method::GET => self.build_get_response(request).await,
+            Method::POST => Ok(Response::new(ResponseCode::from_code(201), Method::POST)),
+            Method::DELETE => Ok(Response::new(ResponseCode::from_code(204), Method::DELETE)),
             _ => Err(io::Error::new(ErrorKind::Other, "method not implemented")), // not implemented
         }
     }
@@ -694,18 +699,31 @@ pub trait Handler: Config {
             .get(&file.extension().unwrap().to_string_lossy().to_string())
             .unwrap();
 
-        let mut child = Command::new(executor)
+        let command_result = Command::new(executor)
             .arg(file)
             .env_clear()
             .envs(self.cgi_envs(request))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .spawn()?;
+            .spawn();
+
+        if matches!(&command_result, Err(err) if err.kind() == ErrorKind::NotFound) {
+            return Err(io::Error::new(
+                ErrorKind::NotFound,
+                format!("CGI failure: {}: command not found", executor.display()),
+            ));
+        }
+
+        let mut child = command_result?;
 
         let raw_left =
             utils::send_body_to_cgi(request, stream, &mut child, raw_left, buffer).await?;
 
-        let output = child.wait_with_output().await?;
+        let future = child.wait_with_output();
+        let output = match tokio::time::timeout(Duration::from_secs(3), future).await {
+            Ok(result) => result?,
+            Err(_) => return Err(io::Error::new(ErrorKind::TimedOut, "CGI timeout")),
+        };
 
         if !output.status.success() {
             return Err(io::Error::new(

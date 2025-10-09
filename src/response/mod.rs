@@ -1,6 +1,7 @@
 use core::str;
 use std::{
     collections::HashMap,
+    fmt::Write,
     io::{Error, ErrorKind},
     path::PathBuf,
 };
@@ -52,14 +53,11 @@ impl Response {
     async fn send_header(&mut self, stream: &mut TcpStream) -> Result<(), Option<Error>> {
         let header = self.serialize_header().await;
 
-        let buffer = header.as_bytes();
-
-        match stream.write_all(buffer).await {
-            Ok(_) => (),
-            Err(err) => return Err(Some(err)),
-        };
-
-        Ok(())
+        match stream.write_all(header.as_bytes()).await {
+            Ok(_) => Ok(()),
+            Err(err) if err.kind() == ErrorKind::UnexpectedEof => Err(None),
+            Err(err) => Err(Some(err)),
+        }
     }
 
     async fn send_body(
@@ -67,19 +65,13 @@ impl Response {
         stream: &mut TcpStream,
         buffer: &mut [u8; 8196],
     ) -> io::Result<()> {
-        if self.file.is_some() {
-            loop {
-                let n = self.file.as_mut().unwrap().read(buffer).await?;
-                if n == 0 {
-                    break;
-                }
-                stream.write_all(&buffer[..n]).await?;
-            }
+        if let Some(ref mut file) = self.file {
+            io::copy(file, stream).await?;
         } else {
-            stream.write_all(self.content.as_bytes()).await?
+            stream.write_all(self.content.as_bytes()).await?;
         }
 
-        stream.write_all(b"/r/n").await?;
+        stream.write_all(b"\r\n").await?;
         Ok(())
     }
 
@@ -92,35 +84,30 @@ impl Response {
     }
 
     async fn serialize_header(&mut self) -> String {
-        let first_line: String = format!(
+        let mut buf = String::with_capacity(1024);
+
+        let _ = write!(
+            buf,
             "HTTP/1.1 {} {}\r\n",
             self.code.code(),
             self.code.to_string()
         );
 
-        let body_len = if self.file.is_some() {
-            self.file.as_ref().unwrap().metadata().await.unwrap().len() as usize + 2
-        } else {
-            self.content.len()
-        };
-
         if self.body_allowed() {
-            self.headers
-                .insert("Content-Length".to_owned(), body_len.to_string());
+            let body_len = if let Some(ref file) = self.file {
+                file.metadata().await.map(|m| m.len()).unwrap_or(0) + 2
+            } else {
+                self.content.len() as u64
+            };
+            let _ = write!(buf, "Content-Length: {}\r\n", body_len);
         }
 
-        let mut headers: String = self
-            .headers
-            .iter()
-            .map(|(key, value)| format!("{key}: {value}"))
-            .collect::<Vec<String>>()
-            .join("\r\n");
-
-        if !headers.is_empty() {
-            headers.push_str("\r\n");
+        for (key, value) in &self.headers {
+            let _ = write!(buf, "{}: {}\r\n", key, value);
         }
 
-        format!("{first_line}{headers}\r\n")
+        buf.push_str("\r\n");
+        buf
     }
 
     pub fn new(code: ResponseCode, request_method: Method) -> Response {

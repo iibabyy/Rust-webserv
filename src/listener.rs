@@ -156,18 +156,11 @@ impl Listener {
         let request = match Request::try_from(header) {
             Ok(request) => request,
             Err(err) => {
-                eprintln!("Error: deserializing header: {}", err.to_string());
+                // eprintln!("Error: deserializing header: {}", err.to_string());
                 send_error_response(stream, err, buffer).await;
                 return Some(raw_left.to_vec());
             }
         };
-
-        // println!(
-        //     "{} {} {}",
-        // 	"[REQUEST]".bright_blue(),
-        // 	request.method().to_string().bright_red(),
-        //     request.path().display().to_string().italic().bright_red(),
-        // );
 
         let server = Self::choose_server_from(&request, servers);
 

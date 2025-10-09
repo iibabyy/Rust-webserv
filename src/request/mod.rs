@@ -164,7 +164,7 @@ impl Request {
     fn parse_first_line(&mut self, line: &str) -> Result<(), String> {
         let split: Vec<&str> = line.split_whitespace().collect();
 
-        if split.len() != 3 {
+        if split.len() < 2 || split.len() > 3 {
             return Err("invalid header: first line invalid".to_string());
         } // Bad Request
 
@@ -175,7 +175,7 @@ impl Request {
         };
 
         self.path = PathBuf::from(split[1]);
-        self.http_version = split[2].to_owned();
+        self.http_version = split.get(2).unwrap_or(&"HTTP/1.1").to_string();
         Ok(())
     }
 
