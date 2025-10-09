@@ -44,7 +44,9 @@ async fn main() {
         Err(err) => return eprintln!("Error: parsing: {err}"),
     };
 
-    if option_t { return println!("----[Parsing réussi !]----") } // parsing fini
+    if option_t {
+        return println!("----[Parsing réussi !]----");
+    } // parsing fini
 
     let addr = IpAddr::from([127, 0, 0, 1]);
     let listeners = match Listener::init_listeners(addr, servers, &cancel_token).await {

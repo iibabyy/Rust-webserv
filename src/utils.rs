@@ -2,7 +2,6 @@ use std::env;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 
-
 pub fn listen_signals(cancel_token: &CancellationToken) {
     tokio::spawn({
         let cancel_token = cancel_token.clone();

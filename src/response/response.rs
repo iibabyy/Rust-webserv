@@ -20,9 +20,9 @@ pub struct Response {
     // header:
     code: ResponseCode,
     headers: HashMap<String, String>,
-	request_method: Method,
+    request_method: Method,
 
-	// body:
+    // body:
     pub file: Option<File>,
     content: String,
 }
@@ -43,9 +43,9 @@ impl Response {
             Err(Some(err)) => return Err(err),
         }
 
-		if self.body_allowed() {
-			self.send_body(stream, buffer).await?;
-		}
+        if self.body_allowed() {
+            self.send_body(stream, buffer).await?;
+        }
 
         Ok(())
     }
@@ -68,7 +68,6 @@ impl Response {
         stream: &mut TcpStream,
         buffer: &mut [u8; 8196],
     ) -> io::Result<()> {
-
         if self.file.is_some() {
             loop {
                 let n = self.file.as_mut().unwrap().read(buffer).await?;
@@ -85,16 +84,15 @@ impl Response {
         Ok(())
     }
 
-	fn body_allowed(&self) -> bool {
-		return
-		if self.code.code == 204 || self.code.code == 304 {
-			false
-		} else if self.request_method == Method::HEAD {
-			false
-		} else {
-			true
-		};
-	}
+    fn body_allowed(&self) -> bool {
+        return if self.code.code == 204 || self.code.code == 304 {
+            false
+        } else if self.request_method == Method::HEAD {
+            false
+        } else {
+            true
+        };
+    }
 
     async fn serialize_header(&mut self) -> String {
         let first_line: String = format!(
@@ -109,9 +107,10 @@ impl Response {
             self.content.len()
         };
 
-		if self.body_allowed() == true {
-			self.headers.insert("Content-Length".to_owned(), body_len.to_string());
-		}
+        if self.body_allowed() == true {
+            self.headers
+                .insert("Content-Length".to_owned(), body_len.to_string());
+        }
 
         let mut headers: String = self
             .headers
@@ -141,7 +140,7 @@ impl Response {
         Response {
             code,
             headers,
-			request_method,
+            request_method,
             file: None,
             content: msg,
         }

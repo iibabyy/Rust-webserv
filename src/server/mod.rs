@@ -9,7 +9,6 @@ pub mod traits;
 pub mod parsing {
     use std::{collections::HashMap, path::PathBuf};
 
-
     pub fn extract_root(value: Vec<String>) -> Result<PathBuf, String> {
         if value.len() != 1 {
             return Err("invalid field: root".to_owned());

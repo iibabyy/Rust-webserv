@@ -17,7 +17,10 @@ use crate::{
     server::{
         server::Server,
         traits::{
-            config::{utils::{self}, Config},
+            config::{
+                utils::{self},
+                Config,
+            },
             handler::Handler,
         },
     },
@@ -66,28 +69,29 @@ impl Listener {
     }
 
     pub async fn listen(self) -> io::Result<()> {
-        println!("{}",
-			format!(
-				"------[listener ({}): start listening]------",
-				self.listener.local_addr().unwrap().to_string().italic()
-			)
-			.bold()
-			.bright_black()
-		);
+        println!(
+            "{}",
+            format!(
+                "------[listener ({}): start listening]------",
+                self.listener.local_addr().unwrap().to_string().italic()
+            )
+            .bold()
+            .bright_black()
+        );
 
         loop {
             let cancel = self.cancel_token.clone();
             tokio::select! {
                 Ok((stream, addr)) = self.listener.accept() => {
                     println!(
-						"{}",
-						format!(
-							"------[Connection incoming: {}]------",
-							addr.to_string().italic()
-						)
-						.bright_black()
-						.bold()
-					);
+                        "{}",
+                        format!(
+                            "------[Connection incoming: {}]------",
+                            addr.to_string().italic()
+                        )
+                        .bright_black()
+                        .bold()
+                    );
                     let server_instance = self.servers.clone();
                     tokio::spawn( async move {
                         let _ = Self::handle_stream(stream, &server_instance).await;
@@ -95,14 +99,14 @@ impl Listener {
                 }
                 _ = cancel.cancelled() => {
                     println!("{}",
-						format!(
-							"------[listener ({}): stop listening]------",
-							self.listener.local_addr().unwrap().to_string().italic()
-						)
-						.bright_black()
-						.bold()
-					);
-					return Ok(());
+                        format!(
+                            "------[listener ({}): stop listening]------",
+                            self.listener.local_addr().unwrap().to_string().italic()
+                        )
+                        .bright_black()
+                        .bold()
+                    );
+                    return Ok(());
                 }
             }
         }
@@ -134,9 +138,9 @@ impl Listener {
                 {
                     Some(raw_left) => raw_left,
                     None => {
-						let _ = stream.shutdown();
-						return Ok(())
-					},
+                        let _ = stream.shutdown();
+                        return Ok(());
+                    }
                 }
             }
         }
@@ -160,18 +164,21 @@ impl Listener {
 
         // println!(
         //     "{} {} {}",
-		// 	"[REQUEST]".bright_blue(),
-		// 	request.method().to_string().bright_red(),
+        // 	"[REQUEST]".bright_blue(),
+        // 	request.method().to_string().bright_red(),
         //     request.path().display().to_string().italic().bright_red(),
         // );
 
         let server = Self::choose_server_from(&request, servers);
 
         let raw_left = if let Some(location) = server.get_request_location(&request) {
-
-			location.handle_request(request, stream, raw_left, buffer).await
+            location
+                .handle_request(request, stream, raw_left, buffer)
+                .await
         } else {
-            server.handle_request(request, stream, raw_left, buffer).await
+            server
+                .handle_request(request, stream, raw_left, buffer)
+                .await
         };
 
         return raw_left;

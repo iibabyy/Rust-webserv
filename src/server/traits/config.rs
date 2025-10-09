@@ -39,7 +39,6 @@ pub trait Config {
     /*------------------------------------------------------------*/
 
     fn parse_request(&self, request: &mut Request) -> Result<(), ResponseCode> {
-
         self.parse_method(request)?;
 
         if self.max_body_size().is_some() && request.content_length() > self.max_body_size() {
@@ -313,9 +312,7 @@ pub mod utils {
 
             html.push_str(&format!(
                 r#"        <button class="{}" onclick="window.location.href='{}'">{}</button>"#,
-                color_class,
-                file_name,
-                file_name
+                color_class, file_name, file_name
             ));
             html.push_str("\r\n");
         }
@@ -376,7 +373,7 @@ pub mod utils {
 
                 while read < length_missing {
                     n = match stream.read(buffer).await? {
-						0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
+                        0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
                         n => n,
                     };
                     read += n;
@@ -449,8 +446,8 @@ pub mod utils {
         let mut n = 0;
         while read < len {
             n = match stream.read(buffer).await? {
-				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
-				n => n,
+                0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
+                n => n,
             };
 
             read += n;

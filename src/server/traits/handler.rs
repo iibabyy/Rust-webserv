@@ -68,19 +68,19 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
-		match self.handle_request_method(&request).await {
-			Ok(()) => (),
-			Err(err) => {
-				eprintln!("Error: {err}");
-				match utils::consume_body(&request, stream, raw_left, buffer).await {
-					Ok(raw_left) => return Some(raw_left),
-					Err(err) => {
-						eprintln!("Error: {err}");
-						return None
-					},
-				}
-			}
-		}
+        match self.handle_request_method(&request).await {
+            Ok(()) => (),
+            Err(err) => {
+                eprintln!("Error: {err}");
+                match utils::consume_body(&request, stream, raw_left, buffer).await {
+                    Ok(raw_left) => return Some(raw_left),
+                    Err(err) => {
+                        eprintln!("Error: {err}");
+                        return None;
+                    }
+                }
+            }
+        }
 
         let raw_left = match self
             .handle_request_body(&request, stream, raw_left, buffer)
@@ -94,7 +94,7 @@ pub trait Handler: Config {
                     _ => {
                         println!("Error: handling body: {}", err.to_string());
                         send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-						return None; // kill stream
+                        return None; // kill stream
                     }
                 }
             }
@@ -105,16 +105,17 @@ pub trait Handler: Config {
             Err(err) => {
                 println!("Error: sending response: {err}");
                 send_error_response(stream, ResponseCode::from_error(&err), buffer).await;
-                if err.kind() == ErrorKind::UnexpectedEof { return None }
+                if err.kind() == ErrorKind::UnexpectedEof {
+                    return None;
+                }
             }
         }
 
-        if request.keep_connection_alive() == true
-		{
-			return Some(raw_left)
-		} else {
-			return None
-		}
+        if request.keep_connection_alive() == true {
+            return Some(raw_left);
+        } else {
+            return None;
+        }
     }
 
     async fn handle_cgi(
@@ -124,8 +125,7 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Option<Vec<u8>> {
-
-		let (output, raw_left) = match self.execute_cgi(request, stream, raw_left, buffer).await {
+        let (output, raw_left) = match self.execute_cgi(request, stream, raw_left, buffer).await {
             Ok(res) => res,
             Err(err) => {
                 eprintln!(
@@ -156,7 +156,6 @@ pub trait Handler: Config {
             }
         }
 
-
         Some(raw_left)
     }
 
@@ -177,7 +176,7 @@ pub trait Handler: Config {
             return Ok(raw_left.to_vec());
         }
 
-		/*	request body  */
+        /*	request body  */
         match request.method() {
             &Method::POST => self.handle_post(request, stream, raw_left, buffer).await,
             _ => utils::consume_body(request, stream, raw_left, buffer).await,
@@ -187,25 +186,22 @@ pub trait Handler: Config {
     /*------------------------------------------------------------*/
     /*-------------------[ Request Actions ]----------------------*/
     /*------------------------------------------------------------*/
-    async fn handle_request_method(
-        &self,
-        request: &Request,
-    ) -> Result<(), io::Error> {
+    async fn handle_request_method(&self, request: &Request) -> Result<(), io::Error> {
         match request.method() {
-			&Method::DELETE => self.handle_delete(request).await,
+            &Method::DELETE => self.handle_delete(request).await,
             _ => Ok(()),
         }
     }
 
-	async fn handle_delete(&self, request: &Request) -> Result<(), io::Error> {
-		if request.path().exists() == false {
-			return Err(io::Error::new(ErrorKind::NotFound, "file not found"))
-		} else if request.path().is_dir() {
-			return Err(io::Error::new(ErrorKind::NotFound, "file not found"))
-		}
+    async fn handle_delete(&self, request: &Request) -> Result<(), io::Error> {
+        if request.path().exists() == false {
+            return Err(io::Error::new(ErrorKind::NotFound, "file not found"));
+        } else if request.path().is_dir() {
+            return Err(io::Error::new(ErrorKind::NotFound, "file not found"));
+        }
 
-		tokio::fs::remove_file(request.path()).await
-	}
+        tokio::fs::remove_file(request.path()).await
+    }
 
     /*------------------------------------------------------------*/
     /*-----------------------[ Upload ]---------------------------*/
@@ -218,7 +214,6 @@ pub trait Handler: Config {
         raw_left: &[u8],
         buffer: &mut [u8; 8196],
     ) -> Result<Vec<u8>, io::Error> {
-
         if request.content_length().is_none() {
             return Ok(raw_left.to_vec());
         } else if self.upload_folder().is_none() {
@@ -391,9 +386,14 @@ pub trait Handler: Config {
 
         loop {
             let n = match stream.read(buffer).await? {
-				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "unexpected end of stream")),
-				n => n,
-			};
+                0 => {
+                    return Err(io::Error::new(
+                        ErrorKind::UnexpectedEof,
+                        "unexpected end of stream",
+                    ))
+                }
+                n => n,
+            };
             temp = raw_left.to_vec();
             temp.append(&mut buffer[..n].to_vec());
             raw_left = temp.as_bytes();
@@ -505,9 +505,14 @@ pub trait Handler: Config {
 
         while readed < read_limit {
             let n = match stream.read(buffer).await? {
-				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "unexpected end of stream")),
-				n => n,
-			};
+                0 => {
+                    return Err(io::Error::new(
+                        ErrorKind::UnexpectedEof,
+                        "unexpected end of stream",
+                    ))
+                }
+                n => n,
+            };
 
             readed += n;
 
@@ -579,20 +584,20 @@ pub trait Handler: Config {
             read += raw_left.len();
         }
 
-		loop {
+        loop {
             n = match stream.read(buffer).await? {
-				0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
+                0 => return Err(io::Error::new(ErrorKind::UnexpectedEof, "stream ended")),
                 n => n,
             };
 
-			read += n;
-			
+            read += n;
+
             if read >= body_len {
-				let too_much_read = read - body_len;
+                let too_much_read = read - body_len;
                 file.write_all(&buffer[..n - too_much_read]).await?;
-				return Ok(buffer[n - too_much_read..n].to_vec())
+                return Ok(buffer[n - too_much_read..n].to_vec());
             } else {
-				file.write_all(&buffer[..n]).await?;
+                file.write_all(&buffer[..n]).await?;
             }
         }
     }
@@ -619,7 +624,7 @@ pub trait Handler: Config {
         request: &Request,
         buffer: &mut [u8; 8196],
     ) -> Result<(), io::Error> {
-		let mut response = self.build_response(request).await?;
+        let mut response = self.build_response(request).await?;
 
         response.send(stream, buffer).await
     }
@@ -676,7 +681,6 @@ pub trait Handler: Config {
         raw_left: &mut [u8],
         buffer: &mut [u8; 8196],
     ) -> Result<(Output, Vec<u8>), io::Error> {
-
         if request.path().is_file() == false {
             return Err(io::Error::new(
                 ErrorKind::NotFound,
