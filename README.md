@@ -70,19 +70,14 @@ server {
 }
 ```
 
-## Building and Running
+## Quick Start
 
 ### Prerequisites
-- Rust (latest stable version)
 - Cargo
-
-### Build
-```bash
-cargo build --release
-```
 
 ### Run
 ```bash
+unzip URIs
 cargo run --release
 ```
 
@@ -91,21 +86,21 @@ cargo run --release
 This test is not very scientific and was simply a small experiment to see roughly how my web server is performing
 
 ```bash
-bombardier http://localhost:8080/ -c 1000 --latencies --fasthttp -H "Connection
-: Close"
-Bombarding http://localhost:8080/ for 10s using 1000 connection(s)
-[========================================================================================================================] 10s
+bombardier http://localhost:8000/tests/simple.txt --latencies --fasthttp -H "Connection: Close" -c 1000
+Bombarding http://localhost:8000/tests/simple.txt for 10s using 1000 connection(s)
+[=========================================================================================================================================================] 10s
 Done!
 Statistics        Avg      Stdev        Max
-  Reqs/sec     10256.26    2923.56   19914.07
-  Latency       97.03ms    30.06ms   511.95ms
+  Reqs/sec     45744.95    7174.15   84265.67
+  Latency       21.89ms     7.81ms   170.64ms
   Latency Distribution
-     50%    93.78ms
-     75%   108.64ms
-     90%   124.37ms
-     95%   136.59ms
-     99%   181.70ms
+     50%    19.44ms
+     75%    28.02ms
+     90%    37.85ms
+     95%    44.99ms
+     99%    60.42ms
   HTTP codes:
-    1xx - 0, 2xx - 103328, 3xx - 0, 4xx - 0, 5xx - 0
+    1xx - 0, 2xx - 457115, 3xx - 0, 4xx - 0, 5xx - 0
     others - 0
+  Throughput:     7.66MB/s
 ```
