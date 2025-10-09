@@ -1,4 +1,4 @@
-use std::env;
+use clap::Parser;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 
@@ -14,31 +14,30 @@ pub fn listen_signals(cancel_token: &CancellationToken) {
     });
 }
 
-pub fn get_args() -> Result<(Option<String>, bool), String> {
-    let args = env::args();
-    let mut option_t = false;
-    let mut config = None;
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub struct CliArgs {
+    /// Configuration file
+    pub file: Option<String>,
 
-    if args.len() > 3 {
-        return Err("Error: too many arguments".to_owned());
-    }
+    #[arg(short, long, default_value_t = true)]
+    pub test: bool,
+}
 
-    let mut i = 0;
-    for arg in args {
-        if i == 0 {
-            i += 1;
-            continue;
+pub struct Args {
+    pub config_file: String,
+    pub test: bool,
+}
+
+impl Args {
+    pub fn new() -> Self {
+        let cli = CliArgs::parse();
+
+        let config_file = cli.file.unwrap_or("default.conf".to_string());
+
+        Args {
+            config_file,
+            test: cli.test,
         }
-        if arg == "t" {
-            if option_t {
-                eprintln!("Warning: duplicate option")
-            } else {
-                option_t = true
-            }
-        } else {
-            config = Some(arg);
-        }
     }
-
-    Ok((config, option_t))
 }

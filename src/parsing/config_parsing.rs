@@ -11,9 +11,8 @@ use nom::{
     IResult,
 };
 
-use crate::LocationBlock;
-
 use super::ServerBlock;
+use crate::parsing::LocationBlock;
 
 // Définition des symboles autorisés dans les identifiants
 #[allow(unused)]
@@ -204,7 +203,7 @@ fn location_block(mut input: &str) -> IResult<&str, LocationBlock> {
 }
 
 // Fichier de configuration : commence avec SOI (Start of Input) et finit avec EOI (End of Input)
-pub fn config(input: &str) -> IResult<&str, Vec<ServerBlock>> {
+pub fn parse_config(input: &str) -> IResult<&str, Vec<ServerBlock>> {
     let (input, servs) = many0(block)(input)?;
 
     let input = skip_whitespaces(input);

@@ -2,7 +2,10 @@ pub mod location;
 pub mod parsing;
 pub mod traits;
 
-use crate::{request::Method, LocationBlock, ServerBlock};
+use crate::{
+    parsing::{LocationBlock, ServerBlock},
+    request::Method,
+};
 use location::Location;
 use traits::{config::Config, handler::Handler};
 

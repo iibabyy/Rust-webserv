@@ -1,8 +1,8 @@
 mod config_parsing;
 
-use std::{collections::HashMap, path::PathBuf};
+use crate::{server::Server, utils::Args};
 
-use config_parsing::config;
+use std::{collections::HashMap, path::PathBuf};
 use tokio::{fs::File, io::AsyncReadExt as _};
 
 #[derive(Debug, Clone)]
@@ -21,8 +21,19 @@ pub struct ServerBlock {
     pub cgi: HashMap<String, PathBuf>,
 }
 
-pub async fn get_config(path: String) -> Result<Vec<ServerBlock>, String> {
-    let mut file = match File::open(path.as_str()).await {
+pub async fn handle_parsing(args: &Args) -> anyhow::Result<HashMap<u16, Vec<Server>>> {
+    let config = get_config(&args.config_file)
+        .await
+        .map_err(|err| anyhow::anyhow!("Error: parsing: {err}"))?;
+
+    let servers =
+        Server::init_servers(config).map_err(|err| anyhow::anyhow!("Error: parsing: {err}"))?;
+
+    Server::parse_servers(servers).map_err(|err| anyhow::anyhow!("Error: parsing: {err}"))
+}
+
+pub async fn get_config(path: &str) -> Result<Vec<ServerBlock>, String> {
+    let mut file = match File::open(path).await {
         Ok(file) => file,
         Err(err) => return Err(format!("{path}: {err}")),
     };
@@ -32,7 +43,7 @@ pub async fn get_config(path: String) -> Result<Vec<ServerBlock>, String> {
         Err(err) => return Err(format!("failed to read {path}: {err}")),
     }
 
-    let (_, servers) = match config(content.as_str()) {
+    let (_, servers) = match config_parsing::parse_config(content.as_str()) {
         Ok(config) => config,
         Err(err) => return Err(format!("Bad config file: {err}")),
     };
