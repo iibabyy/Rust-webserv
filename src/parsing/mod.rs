@@ -6,6 +6,7 @@ use config_parsing::config;
 use tokio::{fs::File, io::AsyncReadExt as _};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LocationBlock {
     pub modifier: Option<String>,
     pub path: String,
