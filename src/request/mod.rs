@@ -36,7 +36,6 @@ impl From<String> for RequestError {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct Request {
     method: Method,
     http_version: String,
@@ -47,9 +46,6 @@ pub struct Request {
     headers: HashMap<String, String>,
     content_length: Option<usize>,
     content_type: Option<String>,
-    raw_body: Option<String>,
-    raw_header: String,
-    state: State,
     keep_connection_alive: bool,
 }
 
@@ -65,9 +61,6 @@ impl Default for Request {
             headers: HashMap::default(),
             content_length: Option::default(),
             content_type: Option::default(),
-            raw_body: Option::default(),
-            raw_header: String::default(),
-            state: State::default(),
             keep_connection_alive: true,
         }
     }
@@ -185,26 +178,6 @@ impl Request {
         Ok(())
     }
 
-    fn add_path(&mut self, path: &str) {
-        if let Some(query_pos) = path.find("?") {
-            self.query = Some(path[query_pos + 1..].to_string());
-            self.path = PathBuf::from(&path[..query_pos]);
-        } else {
-            self.path = PathBuf::from(path)
-        }
-    }
-
-    pub fn get(&self, header: &str) -> Option<&String> {
-        match self.headers.get(header) {
-            None => None,
-            Some(value) => Some(value),
-        }
-    }
-
-    pub fn state(&self) -> &State {
-        &self.state
-    }
-
     pub fn method(&self) -> &Method {
         &self.method
     }
@@ -231,10 +204,6 @@ impl Request {
 
     pub fn keep_connection_alive(&self) -> bool {
         self.keep_connection_alive
-    }
-
-    pub fn http_version(&self) -> &str {
-        &self.http_version
     }
 
     pub fn content_type(&self) -> Option<&String> {
@@ -339,76 +308,6 @@ impl Method {
             Method::OPTIONS => "OPTIONS".to_owned(),
             Method::UNDEFINED | Method::UNKNOWN => "UNKNOWN".to_owned(),
         }
-    }
-}
-
-/*------------------------------------------------------------------------------------*/
-/*										STATE										  */
-/*------------------------------------------------------------------------------------*/
-
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-pub enum State {
-    #[default]
-    Undefined,
-    OnHeader,
-    OnBody,
-    Finished,
-}
-
-impl State {
-    pub fn is(&self, other: Self) -> bool {
-        self.eq(&other)
-    }
-    pub fn is_not(&self, other: Self) -> bool {
-        self.eq(&other)
-    }
-}
-
-mod utils {
-    use lazy_static::lazy_static;
-    use std::collections::HashMap;
-
-    lazy_static! {
-        static ref CONTENT_TYPE_TO_EXT: HashMap<&'static str, &'static str> = {
-            let mut m = HashMap::new();
-            m.insert("application/json", "json");
-            m.insert("application/javascript", "js");
-            m.insert("text/html", "html");
-            m.insert("text/css", "css");
-            m.insert("text/plain", "txt");
-            m.insert("text/csv", "csv");
-            m.insert("image/jpeg", "jpg");
-            m.insert("image/png", "png");
-            m.insert("image/gif", "gif");
-            m.insert("image/svg+xml", "svg");
-            m.insert("audio/mpeg", "mp3");
-            m.insert("audio/wav", "wav");
-            m.insert("video/mp4", "mp4");
-            m.insert("application/pdf", "pdf");
-            m.insert("application/xml", "xml");
-            m.insert("application/zip", "zip");
-            m
-        };
-        static ref EXT_TO_CONTENT_TYPE: HashMap<&'static str, &'static str> = {
-            let mut m = HashMap::new();
-            for (content_type, ext) in CONTENT_TYPE_TO_EXT.iter() {
-                m.insert(*ext, *content_type);
-            }
-            m
-        };
-    }
-
-    /// Convertit un Content-Type en extension de fichier
-    /// Retourne None si le Content-Type n'est pas reconnu
-    pub fn content_type_to_extension(content_type: &str) -> Option<&'static str> {
-        CONTENT_TYPE_TO_EXT.get(content_type).copied()
-    }
-
-    /// Convertit une extension de fichier en Content-Type
-    /// Retourne None si l'extension n'est pas reconnue
-    pub fn extension_to_content_type(extension: &str) -> Option<&'static str> {
-        let ext = extension.trim_start_matches('.');
-        EXT_TO_CONTENT_TYPE.get(ext).copied()
     }
 }
 
