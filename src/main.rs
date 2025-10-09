@@ -1,59 +1,18 @@
 mod listener;
-#[allow(dead_code)]
 mod parsing;
-#[allow(dead_code)]
 mod request;
-#[allow(dead_code)]
 mod response;
 mod server;
+mod utils;
 
-use listener::Listener;
-use parsing::*;
-use server::server::Server;
-use std::{env, net::IpAddr};
-use tokio::{signal, task::JoinSet};
+use crate::listener::Listener;
+use crate::parsing::*;
+use crate::server::server::Server;
+use crate::utils::{get_args, listen_signals};
+
+use std::net::IpAddr;
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
-
-fn listen_signals(cancel_token: &CancellationToken) {
-    tokio::spawn({
-        let cancel_token = cancel_token.clone();
-        async move {
-            if let Ok(()) = signal::ctrl_c().await {
-                println!(" Server shutdown");
-                cancel_token.cancel();
-            }
-        }
-    });
-}
-
-fn get_args() -> Result<(Option<String>, bool), String> {
-    let args = env::args();
-    let mut option_t = false;
-    let mut config = None;
-
-    if args.len() > 3 {
-        return Err("Error: too many arguments".to_owned());
-    }
-
-    let mut i = 0;
-    for arg in args {
-        if i == 0 {
-            i += 1;
-            continue;
-        }
-        if arg == "t" {
-            if option_t == true {
-                eprintln!("Warning: duplicate option")
-            } else {
-                option_t = true
-            }
-        } else {
-            config = Some(arg);
-        }
-    }
-
-    Ok((config, option_t))
-}
 
 #[tokio::main]
 async fn main() {
@@ -85,8 +44,7 @@ async fn main() {
         Err(err) => return eprintln!("Error: parsing: {err}"),
     };
 
-    if option_t == true { return println!("----[Parsing réussi !]----") } // parsing fini
-    ;
+    if option_t { return println!("----[Parsing réussi !]----") } // parsing fini
 
     let addr = IpAddr::from([127, 0, 0, 1]);
     let listeners = match Listener::init_listeners(addr, servers, &cancel_token).await {
@@ -102,11 +60,8 @@ async fn main() {
     }
 
     while let Some(res) = task.join_next().await {
-        match res {
-            Err(e) => {
-                eprintln!("----[Error: {e}]----")
-            }
-            Ok(_) => {}
+        if let Err(e) = res {
+            eprintln!("----[Error: {e}]----");
         }
     }
 }
