@@ -157,6 +157,7 @@ impl Response {
         self
     }
 
+    #[allow(unused)]
     pub fn content(&mut self) -> &String {
         &self.content
     }
