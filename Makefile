@@ -20,7 +20,6 @@ build:
 # Unzips the URIs files
 unzip:
 	@unzip -n URIs.zip
-	@unzip -n URIs2.zip
 
 # Runs cargo watch command
 watch:
